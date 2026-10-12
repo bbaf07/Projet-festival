@@ -6,6 +6,7 @@ et api.py (serveur web).
 
 import json
 import unicodedata
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
@@ -19,6 +20,11 @@ FESTIVAL_DAY_CHANGE = timedelta(hours=6)
 MIN_DURATION = 1  # minutes
 MAX_DURATION = 360  # minutes
 GAP = timedelta(minutes=30)  # battement entre deux spectacles (salle ou artiste)
+MIN_AGE = 0  # âge minimum d'un solo : de 0 à 18 ans
+MAX_AGE = 18
+MIN_ACTS = 2  # un plateau a au moins 2 artistes
+MINUTES_PER_ACT = 10  # chaque artiste d'un plateau joue au moins 10 minutes
+MINUTES_BETWEEN_ACTS = 3  # le présentateur parle 3 minutes entre deux artistes
 
 
 def slugify(name: str) -> str:
@@ -105,39 +111,38 @@ class Artist:
         }
 
 
-@dataclass
-class Performance:
-    """Un spectacle : solo, plateau (lineup) ou atelier (workshop).
+class Performance(ABC):
+    """Ce que tous les spectacles ont en commun.
 
-    Une seule classe pour les trois types : les champs qui ne concernent pas
-    ce type valent None. Chaque `if self.kind == ...` ci-dessous est un signe
-    que l'étape 09 (héritage) sera utile.
+    Classe abstraite : on ne peut pas créer un `Performance` tout court
+    (TypeError), seulement un SoloShow, un Lineup ou un Workshop. Chaque
+    sous-classe doit écrire `roles`, `summary()` et `from_dict()`.
     """
 
-    kind: str
-    title: str
-    venue: Venue
-    start: datetime
-    duration_minutes: int
-    description: str = ""
-    # solo
-    artist: Artist | None = None
-    min_age: int | None = None
-    # lineup
-    host: Artist | None = None
-    acts: list[Artist] | None = None
-    # workshop
-    teacher: Artist | None = None
-    max_participants: int | None = None
-    participants: list[str] | None = None
+    kind = "performance"  # attribut de classe : chaque sous-classe le remplace
 
-    def __post_init__(self) -> None:
-        """Lancé juste après le __init__ écrit par @dataclass : on vérifie."""
-        if not MIN_DURATION <= self.duration_minutes <= MAX_DURATION:
+    def __init__(
+        self,
+        title: str,
+        venue: Venue,
+        start: datetime,
+        duration_minutes: int,
+        description: str = "",
+    ) -> None:
+        if title.strip() == "":
+            raise ValueError("A performance needs a title.")
+        if not MIN_DURATION <= duration_minutes <= MAX_DURATION:
             raise ValueError(
                 f"A performance lasts from {MIN_DURATION} to {MAX_DURATION} "
-                f"minutes, not {self.duration_minutes}."
+                f"minutes, not {duration_minutes}."
             )
+        self.title = title.strip()
+        self.venue = venue
+        self.start = start
+        self.duration_minutes = duration_minutes
+        self.description = description
+
+    # --- Commun à tous les types : écrit une seule fois ---
 
     @property
     def end(self) -> datetime:
@@ -155,37 +160,14 @@ class Performance:
         return f"{self.venue.slug}-{self.start:%Y-%m-%d-%H%M}"
 
     @property
-    def roles(self) -> list[tuple[Artist, str]]:
-        """Les artistes du spectacle avec leur rôle : [(artiste, rôle), ...]."""
-        if self.kind == "solo":
-            return [(self.artist, "solo")]
-        if self.kind == "lineup":
-            return [(self.host, "host")] + [(act, "act") for act in self.acts]
-        if self.kind == "workshop":
-            return [(self.teacher, "teacher")]
-        return []
+    def capacity(self) -> int:
+        """Le nombre de places : celles de la salle (un atelier le remplace)."""
+        return self.venue.capacity
 
     @property
     def artists(self) -> list[Artist]:
         """Les artistes du spectacle, sans leur rôle."""
         return [artist for artist, _role in self.roles]
-
-    @property
-    def summary(self) -> str:
-        """Une phrase qui dit qui est sur scène."""
-        if self.kind == "lineup":
-            acts = ", ".join(act.name for act in self.acts)
-            return f"hosted by {self.host.name}, with {acts}"
-        if self.kind == "workshop":
-            return f"with {self.teacher.name}"
-        return f"by {self.artist.name}"
-
-    @property
-    def places_left(self) -> int | None:
-        """Pour un atelier : les places encore libres. None sinon."""
-        if self.kind != "workshop":
-            return None
-        return self.max_participants - len(self.participants)
 
     def involves(self, artist: Artist) -> bool:
         """Vrai si cet artiste est sur scène ici, quel que soit son rôle."""
@@ -207,8 +189,8 @@ class Performance:
         )
 
     def to_view(self) -> dict:
-        """Ce que l'API envoie : des valeurs simples, les valeurs calculées incluses."""
-        view = {
+        """Les champs communs de la vue API ; chaque sous-classe ajoute les siens."""
+        return {
             "id": self.id,
             "kind": self.kind,
             "title": self.title,
@@ -219,26 +201,14 @@ class Performance:
             "duration_minutes": self.duration_minutes,
             "festival_day": self.festival_day.isoformat(),
             "description": self.description,
-            "summary": self.summary,
-            "capacity": self.venue.capacity,
+            "summary": self.summary(),
+            "capacity": self.capacity,
             "artists": [artist.to_ref() for artist in self.artists],
         }
-        if self.kind == "solo":
-            view["artist"] = self.artist.slug
-            view["min_age"] = self.min_age
-        elif self.kind == "lineup":
-            view["host"] = self.host.slug
-            view["acts"] = [act.slug for act in self.acts]
-        elif self.kind == "workshop":
-            view["teacher"] = self.teacher.slug
-            view["max_participants"] = self.max_participants
-            view["participants"] = self.participants
-            view["places_left"] = self.places_left
-        return view
 
     def to_dict(self) -> dict:
-        """La forme du fichier JSON, dans le même ordre, pour le réécrire."""
-        data = {
+        """Les champs communs du fichier JSON ; chaque sous-classe ajoute les siens."""
+        return {
             "kind": self.kind,
             "title": self.title,
             "venue": self.venue.slug,
@@ -246,17 +216,228 @@ class Performance:
             "duration_minutes": self.duration_minutes,
             "description": self.description,
         }
-        if self.kind == "solo":
-            data["artist"] = self.artist.slug
-            data["min_age"] = self.min_age
-        elif self.kind == "lineup":
-            data["host"] = self.host.slug
-            data["acts"] = [act.slug for act in self.acts]
-        elif self.kind == "workshop":
-            data["teacher"] = self.teacher.slug
-            data["max_participants"] = self.max_participants
-            data["participants"] = self.participants
+
+    @staticmethod
+    def common_fields(festival: "Festival", row: dict) -> dict:
+        """Lit dans un dict du fichier les champs communs à tous les types."""
+        return {
+            "title": row["title"],
+            "venue": festival.venue(row["venue"]),
+            "start": datetime.fromisoformat(row["start"]),
+            "duration_minutes": row["duration_minutes"],
+            "description": row.get("description", ""),
+        }
+
+    # --- Propre à chaque type : chaque sous-classe DOIT l'écrire ---
+
+    @property
+    @abstractmethod
+    def roles(self) -> list[tuple[Artist, str]]:
+        """Les artistes du spectacle avec leur rôle : [(artiste, rôle), ...]."""
+
+    @abstractmethod
+    def summary(self) -> str:
+        """Une phrase qui dit qui est sur scène."""
+
+    @classmethod
+    @abstractmethod
+    def from_dict(cls, festival: "Festival", row: dict) -> "Performance":
+        """Un dict du fichier -> un objet de cette classe."""
+
+
+class SoloShow(Performance):
+    """Un seul artiste sur scène, avec un âge minimum."""
+
+    kind = "solo"
+
+    def __init__(
+        self,
+        title: str,
+        venue: Venue,
+        start: datetime,
+        duration_minutes: int,
+        artist: Artist,
+        min_age: int = 0,
+        description: str = "",
+    ) -> None:
+        super().__init__(title, venue, start, duration_minutes, description)
+        if not MIN_AGE <= min_age <= MAX_AGE:
+            raise ValueError(
+                f"The minimum age goes from {MIN_AGE} to {MAX_AGE}, not {min_age}."
+            )
+        self.artist = artist
+        self.min_age = min_age
+
+    @property
+    def roles(self) -> list[tuple[Artist, str]]:
+        return [(self.artist, "solo")]
+
+    def summary(self) -> str:
+        return self.artist.name
+
+    def to_view(self) -> dict:
+        view = super().to_view()  # la partie commune, puis la sienne
+        view["artist"] = self.artist.slug
+        view["min_age"] = self.min_age
+        return view
+
+    def to_dict(self) -> dict:
+        data = super().to_dict()
+        data["artist"] = self.artist.slug
+        data["min_age"] = self.min_age
         return data
+
+    @classmethod
+    def from_dict(cls, festival: "Festival", row: dict) -> "SoloShow":
+        return cls(
+            **cls.common_fields(festival, row),
+            artist=festival.artist(row["artist"]),
+            min_age=row.get("min_age", 0),
+        )
+
+
+class Lineup(Performance):
+    """Un plateau : un présentateur (host) et plusieurs artistes (acts)."""
+
+    kind = "lineup"
+
+    def __init__(
+        self,
+        title: str,
+        venue: Venue,
+        start: datetime,
+        duration_minutes: int,
+        host: Artist,
+        acts: list[Artist],
+        description: str = "",
+    ) -> None:
+        super().__init__(title, venue, start, duration_minutes, description)
+        if len(acts) < MIN_ACTS:
+            raise ValueError(f"A lineup needs at least {MIN_ACTS} acts.")
+        if len(set(acts)) != len(acts):
+            raise ValueError("Each act appears only once in a lineup.")
+        if host in acts:
+            raise ValueError(f"{host.name} cannot be both the host and an act.")
+        # 10 minutes par artiste, et 3 minutes pour le présentateur entre deux.
+        needed = MINUTES_PER_ACT * len(acts) + MINUTES_BETWEEN_ACTS * (len(acts) - 1)
+        if duration_minutes < needed:
+            raise ValueError(
+                f"A lineup of {len(acts)} acts needs at least {needed} minutes, "
+                f"not {duration_minutes}."
+            )
+        self.host = host
+        self.acts = list(acts)
+
+    @property
+    def roles(self) -> list[tuple[Artist, str]]:
+        return [(self.host, "host")] + [(act, "act") for act in self.acts]
+
+    def summary(self) -> str:
+        acts = ", ".join(act.name for act in self.acts)
+        return f"hosted by {self.host.name}, with {acts}"
+
+    def to_view(self) -> dict:
+        view = super().to_view()
+        view["host"] = self.host.slug
+        view["acts"] = [act.slug for act in self.acts]
+        return view
+
+    def to_dict(self) -> dict:
+        data = super().to_dict()
+        data["host"] = self.host.slug
+        data["acts"] = [act.slug for act in self.acts]
+        return data
+
+    @classmethod
+    def from_dict(cls, festival: "Festival", row: dict) -> "Lineup":
+        return cls(
+            **cls.common_fields(festival, row),
+            host=festival.artist(row["host"]),
+            acts=[festival.artist(slug) for slug in row["acts"]],
+        )
+
+
+class Workshop(Performance):
+    """Un atelier : un enseignant et des participants inscrits."""
+
+    kind = "workshop"
+
+    def __init__(
+        self,
+        title: str,
+        venue: Venue,
+        start: datetime,
+        duration_minutes: int,
+        teacher: Artist,
+        max_participants: int,
+        participants: list[str] | None = None,
+        description: str = "",
+    ) -> None:
+        super().__init__(title, venue, start, duration_minutes, description)
+        if max_participants < 1:
+            raise ValueError("A workshop needs at least 1 place.")
+        self.teacher = teacher
+        self.max_participants = max_participants
+        self.participants = list(participants or [])
+        if len(self.participants) > self.places:
+            raise ValueError(
+                f"{self.title} has {self.places} places, not {len(self.participants)}."
+            )
+
+    @property
+    def places(self) -> int:
+        """Les places : le maximum demandé, mais jamais plus que la salle."""
+        return min(self.max_participants, self.venue.capacity)
+
+    @property
+    def places_left(self) -> int:
+        return self.places - len(self.participants)
+
+    @property
+    def capacity(self) -> int:
+        """Un atelier remplace la capacité de la salle par ses places."""
+        return self.places
+
+    @property
+    def roles(self) -> list[tuple[Artist, str]]:
+        return [(self.teacher, "teacher")]
+
+    def summary(self) -> str:
+        taken = len(self.participants)
+        return f"with {self.teacher.name}, {taken}/{self.places} places taken"
+
+    def to_view(self) -> dict:
+        view = super().to_view()
+        view["teacher"] = self.teacher.slug
+        view["max_participants"] = self.max_participants
+        view["participants"] = list(self.participants)
+        view["places_left"] = self.places_left
+        return view
+
+    def to_dict(self) -> dict:
+        data = super().to_dict()
+        data["teacher"] = self.teacher.slug
+        data["max_participants"] = self.max_participants
+        data["participants"] = list(self.participants)
+        return data
+
+    @classmethod
+    def from_dict(cls, festival: "Festival", row: dict) -> "Workshop":
+        return cls(
+            **cls.common_fields(festival, row),
+            teacher=festival.artist(row["teacher"]),
+            max_participants=row["max_participants"],
+            participants=row.get("participants", []),
+        )
+
+
+# Le seul endroit où le mot "kind" choisit quelque chose : à la lecture.
+# Un dict fait le choix de la classe, sans aucun if.
+KINDS: dict[str, type[Performance]] = {
+    "solo": SoloShow,
+    "lineup": Lineup,
+    "workshop": Workshop,
+}
 
 
 class Festival:
@@ -483,27 +664,11 @@ def load_festival(path: str) -> Festival:
 
 
 def performance_from_dict(festival: Festival, row: dict) -> Performance:
-    """Un dict du fichier -> un objet Performance (les identifiants -> objets)."""
-    kind = row["kind"]
-    performance = Performance(
-        kind=kind,
-        title=row["title"],
-        venue=festival.venue(row["venue"]),
-        start=datetime.fromisoformat(row["start"]),
-        duration_minutes=row["duration_minutes"],
-        description=row["description"],
-    )
-    if kind == "solo":
-        performance.artist = festival.artist(row["artist"])
-        performance.min_age = row["min_age"]
-    elif kind == "lineup":
-        performance.host = festival.artist(row["host"])
-        performance.acts = [festival.artist(slug) for slug in row["acts"]]
-    elif kind == "workshop":
-        performance.teacher = festival.artist(row["teacher"])
-        performance.max_participants = row["max_participants"]
-        performance.participants = row["participants"]
-    return performance
+    """Un dict du fichier -> un objet de la bonne classe, choisie par "kind"."""
+    kind = row.get("kind")
+    if kind not in KINDS:
+        raise ValueError(f"Unknown kind of performance {kind!r}.")
+    return KINDS[kind].from_dict(festival, row)
 
 
 def save_festival(festival: Festival, path: str) -> None:

@@ -16,7 +16,8 @@ import sys
 from festival import (
     DATA_FILE,
     Festival,
-    Performance,
+    SoloShow,
+    Workshop,
     load_festival,
     parse_day,
     parse_minutes,
@@ -90,9 +91,8 @@ def ask_and_add(festival: Festival) -> None:
     start = parse_moment(input("Start (YYYY-MM-DDTHH:MM): ").strip())
     duration = parse_minutes(input("Duration (minutes): ").strip())
     # venue() / artist() lèvent une erreur si l'identifiant est inconnu,
-    # et Performance(...) refuse une durée hors des règles (__post_init__).
-    new = Performance(
-        kind="solo",
+    # et SoloShow(...) refuse une durée hors des règles (dans __init__).
+    new = SoloShow(
         title=title,
         venue=festival.venue(venue_slug),
         start=start,
@@ -146,7 +146,7 @@ def show_explore(festival: Festival) -> None:
     # 5. Chaque atelier : son jour et ses inscrits
     print()
     for performance in festival.performances:
-        if performance.kind == "workshop":
+        if isinstance(performance, Workshop):
             print(
                 f"{performance.title} on {performance.festival_day}: "
                 f"{len(performance.participants)}/{performance.max_participants} "

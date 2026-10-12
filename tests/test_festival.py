@@ -13,7 +13,16 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api import app
-from festival import Artist, Festival, Performance, Venue, load_festival
+from festival import (
+    Artist,
+    Festival,
+    Lineup,
+    Performance,
+    SoloShow,
+    Venue,
+    Workshop,
+    load_festival,
+)
 
 DATA_FILE = Path(__file__).parent.parent / "data" / "festival.json"
 
@@ -27,8 +36,7 @@ def festival() -> Festival:
 
 def solo(festival: Festival, artist: str, venue: str, start: str, minutes=30):
     """Fabrique un solo à partir des identifiants, pour écrire des tests courts."""
-    return Performance(
-        kind="solo",
+    return SoloShow(
         title="Test Show",
         venue=festival.venue(venue),
         start=datetime.fromisoformat(start),
@@ -228,3 +236,118 @@ def test_api_unknown_venue_is_a_404():
     response = client.get("/api/programme", params={"venue": "nowhere"})
     assert response.status_code == 404
     assert response.json() == {"detail": "No venue 'nowhere'."}
+
+
+# ----- Étape 09 : trois types, chacun ses règles -----
+
+
+def lineup(festival: Festival, acts: list[str], minutes: int, host="tom-vasseur"):
+    """Fabrique un plateau le 13 à 08:00 à La Cabane."""
+    return Lineup(
+        title="Test Lineup",
+        venue=festival.venue("la-cabane"),
+        start=datetime(2027, 6, 13, 8, 0),
+        duration_minutes=minutes,
+        host=festival.artist(host),
+        acts=[festival.artist(slug) for slug in acts],
+    )
+
+
+def workshop(festival: Festival, venue: str, max_participants: int, participants=()):
+    """Fabrique un atelier le 13 à 08:00."""
+    return Workshop(
+        title="Test Workshop",
+        venue=festival.venue(venue),
+        start=datetime(2027, 6, 13, 8, 0),
+        duration_minutes=60,
+        teacher=festival.artist("ines-moreau"),
+        max_participants=max_participants,
+        participants=list(participants),
+    )
+
+
+def test_a_bare_performance_cannot_be_created(festival):
+    with pytest.raises(TypeError):
+        Performance("X", festival.venue("la-cabane"), datetime(2027, 6, 13, 8), 30)
+
+
+def test_the_loader_chooses_the_class(festival):
+    assert isinstance(festival.performance("le-kiosque-2027-06-12-0100"), Lineup)
+    assert isinstance(festival.performance("la-cabane-2027-06-11-1030"), Workshop)
+    assert isinstance(festival.performance("grand-casino-2027-06-11-2030"), SoloShow)
+
+
+@pytest.mark.parametrize(
+    ("performance_id", "summary"),
+    [
+        (
+            "le-kiosque-2027-06-12-0100",
+            "hosted by Tom Vasseur, with Hugo Lemaire, Maya Choukri",
+        ),
+        ("la-cabane-2027-06-11-1030", "with Inès Moreau, 3/12 places taken"),
+        ("grand-casino-2027-06-11-2030", "Léa Fontaine"),
+    ],
+)
+def test_each_kind_writes_its_own_summary(festival, performance_id, summary):
+    assert festival.performance(performance_id).summary() == summary
+
+
+@pytest.mark.parametrize("min_age", [-1, 19])
+def test_a_minimum_age_out_of_range_is_refused(festival, min_age):
+    with pytest.raises(ValueError, match="minimum age goes from 0 to 18"):
+        SoloShow(
+            "X",
+            festival.venue("la-cabane"),
+            datetime(2027, 6, 13, 8),
+            30,
+            artist=festival.artist("karim-benali"),
+            min_age=min_age,
+        )
+
+
+def test_a_lineup_needs_two_acts(festival):
+    with pytest.raises(ValueError, match="at least 2 acts"):
+        lineup(festival, ["hugo-lemaire"], 60)
+
+
+def test_each_act_only_once(festival):
+    with pytest.raises(ValueError, match="only once"):
+        lineup(festival, ["hugo-lemaire", "hugo-lemaire"], 60)
+
+
+def test_the_host_is_not_an_act(festival):
+    with pytest.raises(ValueError, match="both the host and an act"):
+        lineup(festival, ["hugo-lemaire", "tom-vasseur"], 60)
+
+
+def test_a_lineup_of_three_acts_needs_36_minutes(festival):
+    acts = ["hugo-lemaire", "maya-choukri", "karim-benali"]
+    with pytest.raises(ValueError, match="at least 36 minutes, not 35"):
+        lineup(festival, acts, 35)
+    assert lineup(festival, acts, 36).duration_minutes == 36
+
+
+def test_a_workshop_needs_one_place(festival):
+    with pytest.raises(ValueError, match="at least 1 place"):
+        workshop(festival, "la-cabane", 0)
+
+
+def test_workshop_places_never_exceed_the_venue(festival):
+    big = workshop(festival, "grand-casino", 999)
+    assert big.places == 650
+    assert big.capacity == 650
+
+
+def test_a_workshop_cannot_hold_more_participants_than_places(festival):
+    with pytest.raises(ValueError, match="has 1 places, not 2"):
+        workshop(festival, "la-cabane", 1, ["Lou", "Zoé"])
+
+
+def test_the_view_of_each_kind_adds_its_own_fields(festival):
+    common = {"id", "kind", "title", "venue", "venue_name", "start", "end"}
+    solo_view = festival.performance("grand-casino-2027-06-11-2030").to_view()
+    assert common <= set(solo_view)
+    assert {"artist", "min_age"} <= set(solo_view)
+    workshop_view = festival.performance("la-cabane-2027-06-11-1030").to_view()
+    assert workshop_view["places_left"] == 9
+    assert "acts" not in workshop_view
