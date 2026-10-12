@@ -1,17 +1,21 @@
-/* Deauville Festival du Rire 2027 — styles partagés par le site et l'admin. */
+/* Deauville Festival du Rire 2027 — styles partagés par le site et l'admin.
+   Thème sombre, avec des clés de sol animées en fond (background.js). */
 
 :root {
-  --ink: #1b2240;
-  --ink-soft: #4a5275;
-  --paper: #fbf7f0;
-  --card: #ffffff;
-  --line: #e7e0d3;
-  --coral: #ff5a4e;
-  --coral-dark: #d63b30;
+  color-scheme: dark;
+  --bg: #0a1120;
+  --surface: #121b30;
+  --surface-raised: #182440;
+  --line: #253552;
+  --text: #cbd5f0;
+  --heading: #f2f6ff;
+  --muted: #8b98b8;
+  --coral: #ff6b5e;
+  --coral-dark: #e5493c;
   --sun: #ffc93c;
-  --sea: #2f7f9e;
-  --green: #2e8b57;
-  --shadow: 0 2px 10px rgba(27, 34, 64, 0.08);
+  --sea: #4fb3d9;
+  --green: #34d399;
+  --shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
   --radius: 14px;
   --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --display: Georgia, "Times New Roman", serif;
@@ -23,37 +27,78 @@
 
 body {
   margin: 0;
-  background: var(--paper);
-  color: var(--ink);
+  background: var(--bg);
+  color: var(--text);
   font-family: var(--font);
   line-height: 1.5;
+}
+
+h1,
+h2,
+h3 {
+  color: var(--heading);
 }
 
 a {
   color: var(--sea);
 }
 
+.muted {
+  color: var(--muted);
+}
+
+/* ----- Le fond : des clés de sol qui apparaissent et disparaissent ----- */
+
+.bg-clefs {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.bg-clef {
+  position: absolute;
+  color: var(--sun);
+  line-height: 1;
+  font-family: "Segoe UI Symbol", "Noto Music", "Bravura", serif;
+  opacity: 0;
+  animation-name: clef-fade;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+@keyframes clef-fade {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: var(--peak);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bg-clef {
+    animation: none;
+    opacity: calc(var(--peak) * 0.6);
+  }
+}
+
+/* Tout le contenu passe au-dessus du fond. */
+.hero,
+main,
+footer {
+  position: relative;
+  z-index: 1;
+}
+
 /* ----- En-tête ----- */
 
 .hero {
-  background: var(--ink);
-  color: #fff;
+  background: linear-gradient(180deg, rgba(18, 27, 48, 0.95), rgba(10, 17, 32, 0.6));
+  border-bottom: 1px solid var(--line);
   padding: 28px 16px 24px;
-  position: relative;
-  overflow: hidden;
-}
-
-.hero::after {
-  /* les rayures d'une cabine de plage */
-  content: "";
-  position: absolute;
-  inset: auto 0 0 0;
-  height: 8px;
-  background: repeating-linear-gradient(
-    90deg,
-    var(--coral) 0 24px,
-    #fff 24px 48px
-  );
 }
 
 .hero-inner,
@@ -67,6 +112,12 @@ main {
   font-size: clamp(1.8rem, 4vw, 2.8rem);
   margin: 0 0 4px;
   letter-spacing: -0.5px;
+}
+
+.hero h1 .clef {
+  color: var(--sun);
+  font-family: "Segoe UI Symbol", "Noto Music", serif;
+  margin-right: 6px;
 }
 
 .hero .dates {
@@ -83,14 +134,13 @@ main {
 }
 
 .hero nav a {
-  color: #fff;
-  opacity: 0.85;
+  color: var(--text);
   text-decoration: none;
   font-weight: 500;
 }
 
 .hero nav a:hover {
-  opacity: 1;
+  color: var(--heading);
   text-decoration: underline;
 }
 
@@ -108,14 +158,11 @@ h2 {
   margin: 0 0 14px;
 }
 
-.muted {
-  color: var(--ink-soft);
-}
-
 /* ----- Sur scène maintenant ----- */
 
 .now {
-  background: var(--card);
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 18px 20px;
@@ -133,6 +180,7 @@ h2 {
   height: 12px;
   border-radius: 50%;
   background: var(--coral);
+  box-shadow: 0 0 10px var(--coral);
   animation: pulse 1.6s infinite;
 }
 
@@ -155,6 +203,7 @@ h2 {
 .now-item {
   font-size: 1.15rem;
   font-weight: 600;
+  color: var(--heading);
 }
 
 .up-next {
@@ -166,13 +215,13 @@ h2 {
 }
 
 .up-next li {
-  color: var(--ink-soft);
+  color: var(--muted);
 }
 
 .up-next time {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-  color: var(--ink);
+  color: var(--text);
   margin-right: 6px;
 }
 
@@ -194,9 +243,9 @@ h2 {
 }
 
 .tab {
-  border: 2px solid var(--ink);
-  background: transparent;
-  color: var(--ink);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
   border-radius: 999px;
   padding: 6px 16px;
   font: inherit;
@@ -204,20 +253,32 @@ h2 {
   cursor: pointer;
 }
 
+.tab:hover {
+  border-color: var(--sun);
+}
+
 .tab[aria-selected="true"] {
-  background: var(--ink);
-  color: #fff;
+  background: var(--sun);
+  border-color: var(--sun);
+  color: var(--bg);
 }
 
 select,
 input,
 textarea {
   font: inherit;
-  color: inherit;
+  color: var(--text);
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 8px 10px;
-  background: #fff;
+  background: var(--surface-raised);
+}
+
+select:focus,
+input:focus,
+textarea:focus {
+  outline: 2px solid var(--sun);
+  outline-offset: 1px;
 }
 
 /* ----- Cartes de spectacles ----- */
@@ -229,14 +290,15 @@ textarea {
 }
 
 .card {
-  background: var(--card);
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 16px 18px;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  border-top: 5px solid var(--sea);
+  border-top: 4px solid var(--sea);
 }
 
 .card.kind-solo {
@@ -255,6 +317,7 @@ textarea {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   font-size: 1.05rem;
+  color: var(--heading);
 }
 
 .card h3 {
@@ -263,7 +326,7 @@ textarea {
 }
 
 .card .venue {
-  color: var(--ink-soft);
+  color: var(--muted);
   font-size: 0.95rem;
 }
 
@@ -273,7 +336,7 @@ textarea {
 
 .card .description {
   margin: 0;
-  color: var(--ink-soft);
+  color: var(--muted);
   font-size: 0.92rem;
 }
 
@@ -291,30 +354,35 @@ textarea {
   font-weight: 700;
   padding: 2px 9px;
   border-radius: 999px;
-  background: #eef1f8;
-  color: var(--ink);
+  background: var(--surface-raised);
+  color: var(--text);
+  border: 1px solid var(--line);
 }
 
 .badge.age {
-  background: var(--ink);
-  color: #fff;
+  background: rgba(255, 107, 94, 0.15);
+  border-color: rgba(255, 107, 94, 0.4);
+  color: var(--coral);
 }
 
 .badge.places {
-  background: #e3f4ea;
+  background: rgba(52, 211, 153, 0.12);
+  border-color: rgba(52, 211, 153, 0.35);
   color: var(--green);
 }
 
 .badge.full {
-  background: #fde4e2;
-  color: var(--coral-dark);
+  background: rgba(255, 107, 94, 0.15);
+  border-color: rgba(255, 107, 94, 0.4);
+  color: var(--coral);
 }
 
 .empty {
   padding: 30px;
   text-align: center;
-  color: var(--ink-soft);
-  background: var(--card);
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
 }
 
@@ -327,18 +395,22 @@ textarea {
 }
 
 .artist {
-  background: var(--card);
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 16px;
   text-align: center;
   text-decoration: none;
-  color: var(--ink);
-  transition: transform 0.15s;
+  color: var(--heading);
+  transition:
+    transform 0.15s,
+    border-color 0.15s;
 }
 
 .artist:hover {
   transform: translateY(-3px);
+  border-color: var(--sun);
 }
 
 .avatar {
@@ -351,8 +423,8 @@ textarea {
   font-family: var(--display);
   font-size: 1.6rem;
   font-weight: 700;
-  color: #fff;
-  background: var(--sea);
+  color: var(--bg);
+  background: linear-gradient(135deg, var(--sun), var(--coral));
   object-fit: cover;
 }
 
@@ -374,18 +446,19 @@ textarea {
 /* ----- Boutons et messages (utilisés surtout par l'admin) ----- */
 
 .button {
-  border: none;
+  border: 1px solid transparent;
   border-radius: 8px;
   padding: 9px 16px;
   font: inherit;
   font-weight: 600;
   cursor: pointer;
-  background: var(--ink);
-  color: #fff;
+  background: var(--surface-raised);
+  color: var(--heading);
 }
 
 .button.primary {
   background: var(--coral);
+  color: #fff;
 }
 
 .button.primary:hover {
@@ -394,14 +467,22 @@ textarea {
 
 .button.ghost {
   background: transparent;
-  color: var(--ink);
-  border: 1px solid var(--line);
+  color: var(--text);
+  border-color: var(--line);
+}
+
+.button.ghost:hover {
+  border-color: var(--sun);
 }
 
 .button.danger {
   background: transparent;
-  color: var(--coral-dark);
-  border: 1px solid #f3c3bf;
+  color: var(--coral);
+  border-color: rgba(255, 107, 94, 0.4);
+}
+
+.button.danger:hover {
+  background: rgba(255, 107, 94, 0.12);
 }
 
 .button.small {
@@ -410,8 +491,9 @@ textarea {
 }
 
 .error-box {
-  background: #fde4e2;
-  color: var(--coral-dark);
+  background: rgba(255, 107, 94, 0.12);
+  border: 1px solid rgba(255, 107, 94, 0.4);
+  color: #ffb3ac;
   border-radius: 8px;
   padding: 10px 14px;
   font-weight: 600;
@@ -422,8 +504,9 @@ textarea {
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--ink);
-  color: #fff;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  color: var(--heading);
   padding: 12px 20px;
   border-radius: 10px;
   box-shadow: var(--shadow);
@@ -433,6 +516,7 @@ textarea {
 
 #toast.error {
   background: var(--coral-dark);
+  border-color: var(--coral-dark);
 }
 
 #toast[hidden] {
@@ -441,7 +525,7 @@ textarea {
 
 footer {
   text-align: center;
-  color: var(--ink-soft);
+  color: var(--muted);
   font-size: 0.85rem;
   padding: 20px 16px 40px;
 }
