@@ -15,58 +15,54 @@ import sys
 
 from festival import (
     DATA_FILE,
+    Festival,
+    Performance,
     add_performance,
     cancel_performance,
-    end_of,
-    festival_day_of,
     festival_days,
     find_artist,
+    get_artist,
+    get_venue,
     load_festival,
     next_after,
     on_stage_at,
     parse_day,
     parse_minutes,
     parse_moment,
-    performance_id,
     performances_of_artist,
-    programme_of_day,
-    roles_in,
+    programme,
     save_festival,
-    slugify,
-    start_of,
     total_seats,
-    venue_name,
 )
 
 # ----- Fonctions qui affichent : une par commande, en bout de chaîne -----
 
 
-def show_summary(festival: dict) -> None:
-    print(festival["name"])
-    print(f"From {festival['first_day']} to {festival['last_day']}")
+def show_summary(festival: Festival) -> None:
+    print(festival.name)
+    print(f"From {festival.first_day} to {festival.last_day}")
     print(
-        f"{len(festival['venues'])} venues, "
-        f"{len(festival['artists'])} artists, "
-        f"{len(festival['performances'])} performances"
+        f"{len(festival.venues)} venues, "
+        f"{len(festival.artists)} artists, "
+        f"{len(festival.performances)} performances"
     )
 
 
-def show_venues(festival: dict) -> None:
-    for venue in festival["venues"]:
-        print(f"{slugify(venue['name'])}: {venue['name']}, {venue['capacity']} seats")
+def show_venues(festival: Festival) -> None:
+    for venue in festival.venues:
+        print(f"{venue.slug}: {venue.name}, {venue.capacity} seats")
     print(f"Total: {total_seats(festival)} seats")
 
 
-def performance_line(festival: dict, performance: dict) -> str:
+def performance_line(performance: Performance) -> str:
     """Une ligne de programme : "21:30-22:40 | Salle | Titre (type)"."""
-    venue = venue_name(festival, performance["venue"])
     return (
-        f"{start_of(performance):%H:%M}-{end_of(performance):%H:%M} | {venue} | "
-        f"{performance['title']} ({performance['kind']})"
+        f"{performance.start:%H:%M}-{performance.end:%H:%M} | "
+        f"{performance.venue.name} | {performance.title} ({performance.kind})"
     )
 
 
-def show_programme(festival: dict, day_text: str) -> None:
+def show_programme(festival: Festival, day_text: str) -> None:
     day = parse_day(day_text)
     days = festival_days(festival)
     if day not in days:
@@ -74,114 +70,114 @@ def show_programme(festival: dict, day_text: str) -> None:
         print(f"No performance on {day_text!r}. Days: {days_text}")
         return
     print(f"Programme for {day:%A %d %B}:")
-    for performance in programme_of_day(festival, day):
-        print(performance_line(festival, performance))
+    for performance in programme(festival, day=day):
+        print(performance_line(performance))
 
 
-def show_artist(festival: dict, slug: str) -> None:
+def show_artist(festival: Festival, slug: str) -> None:
     artist = find_artist(festival, slug)
     if artist is None:
         print(f"No artist {slug!r}.")
         return
-    print(artist["name"])
-    for performance, role in performances_of_artist(festival, slug):
-        day = festival_day_of(performance)
-        start = start_of(performance)
-        end = end_of(performance)
-        venue = venue_name(festival, performance["venue"])
+    print(artist.name)
+    for performance, role in performances_of_artist(festival, artist):
         print(
-            f"{day:%a %d} {start:%H:%M}-{end:%H:%M} | {venue} | "
-            f"{performance['title']} ({role})"
+            f"{performance.festival_day:%a %d} "
+            f"{performance.start:%H:%M}-{performance.end:%H:%M} | "
+            f"{performance.venue.name} | {performance.title} ({role})"
         )
 
 
-def show_now(festival: dict, moment_text: str) -> None:
+def show_now(festival: Festival, moment_text: str) -> None:
     moment = parse_moment(moment_text)
     print(f"On stage at {moment:%Y-%m-%d %H:%M}:")
     for performance in on_stage_at(festival, moment):
-        venue = venue_name(festival, performance["venue"])
-        print(f"- {performance['title']} at {venue}, until {end_of(performance):%H:%M}")
+        print(
+            f"- {performance.title} at {performance.venue.name}, "
+            f"until {performance.end:%H:%M}"
+        )
     print("Up next:")
     for performance in next_after(festival, moment, 3):
-        print(f"- {performance_line(festival, performance)}")
+        print(f"- {performance_line(performance)}")
 
 
-def ask_and_add(festival: dict) -> None:
-    """Commande add : pose les questions, vérifie, ajoute, sauvegarde."""
+def ask_and_add(festival: Festival) -> None:
+    """Commande add : pose les questions, crée l'objet, vérifie, ajoute, sauve."""
     title = input("Title: ").strip()
-    artist = input("Artist (slug): ").strip()
-    venue = input("Venue (slug): ").strip()
+    artist_slug = input("Artist (slug): ").strip()
+    venue_slug = input("Venue (slug): ").strip()
     start = parse_moment(input("Start (YYYY-MM-DDTHH:MM): ").strip())
     duration = parse_minutes(input("Duration (minutes): ").strip())
-    new = {
-        "kind": "solo",
-        "title": title,
-        "venue": venue,
-        "start": f"{start:%Y-%m-%dT%H:%M}",
-        "duration_minutes": duration,
-        "description": "",
-        "artist": artist,
-        "min_age": 0,
-    }
+    # get_venue / get_artist lèvent une erreur si l'identifiant est inconnu,
+    # et Performance(...) refuse une durée hors des règles (__post_init__).
+    new = Performance(
+        kind="solo",
+        title=title,
+        venue=get_venue(festival, venue_slug),
+        start=start,
+        duration_minutes=duration,
+        artist=get_artist(festival, artist_slug),
+        min_age=0,
+    )
     add_performance(festival, new)
     save_festival(festival, DATA_FILE)
-    print(f"Added: {performance_id(new)}")
+    print(f"Added: {new.id}")
 
 
-def cancel_and_save(festival: dict, performance_id_text: str) -> None:
+def cancel_and_save(festival: Festival, performance_id: str) -> None:
     """Commande cancel : retire le spectacle puis sauvegarde."""
-    cancelled = cancel_performance(festival, performance_id_text)
+    cancelled = cancel_performance(festival, performance_id)
     save_festival(festival, DATA_FILE)
-    print(f"Cancelled: {cancelled['title']}")
+    print(f"Cancelled: {cancelled.title}")
 
 
-def show_explore(festival: dict) -> None:
+def show_explore(festival: Festival) -> None:
     """Les six questions de l'étape 01."""
     # 1. Chaque salle avec ses places et son adresse, puis le total
     print("Venues:")
-    for venue in festival["venues"]:
-        print(f"- {venue['name']}: {venue['capacity']} seats ({venue['address']})")
+    for venue in festival.venues:
+        print(f"- {venue.name}: {venue.capacity} seats ({venue.address})")
     print(f"Total: {total_seats(festival)} seats")
 
     # 2. Nombre de spectacles par type
     print()
     kind_counts = {}
-    for performance in festival["performances"]:
-        kind = performance["kind"]
-        kind_counts[kind] = kind_counts.get(kind, 0) + 1
+    for performance in festival.performances:
+        kind_counts[performance.kind] = kind_counts.get(performance.kind, 0) + 1
     for kind in sorted(kind_counts):
         print(f"{kind}: {kind_counts[kind]}")
 
     # 3. Spectacles au Kiosque
     print()
     print("At Le Kiosque:")
-    for performance in festival["performances"]:
-        if performance["venue"] == "le-kiosque":
-            print(f"- {performance['start']} {performance['title']}")
+    for performance in festival.performances:
+        if performance.venue.slug == "le-kiosque":
+            print(f"- {performance.start:%Y-%m-%dT%H:%M} {performance.title}")
 
     # 4. Le spectacle le plus long
     print()
-    longest = festival["performances"][0]
-    for performance in festival["performances"]:
-        if performance["duration_minutes"] > longest["duration_minutes"]:
+    longest = festival.performances[0]
+    for performance in festival.performances:
+        if performance.duration_minutes > longest.duration_minutes:
             longest = performance
-    print(f"Longest: {longest['title']} ({longest['duration_minutes']} min)")
+    print(f"Longest: {longest.title} ({longest.duration_minutes} min)")
 
     # 5. Chaque atelier : son jour et ses inscrits
     print()
-    for performance in festival["performances"]:
-        if performance["kind"] == "workshop":
-            day = festival_day_of(performance)
-            registered = len(performance["participants"])
-            places = performance["max_participants"]
-            print(f"{performance['title']} on {day}: {registered}/{places} registered")
+    for performance in festival.performances:
+        if performance.kind == "workshop":
+            print(
+                f"{performance.title} on {performance.festival_day}: "
+                f"{len(performance.participants)}/{performance.max_participants} "
+                "registered"
+            )
 
     # 6. [ext.] Les artistes les plus souvent sur scène
     print()
     stage_counts = {}
-    for performance in festival["performances"]:
-        for artist_slug, _role in roles_in(performance):
-            stage_counts[artist_slug] = stage_counts.get(artist_slug, 0) + 1
+    for performance in festival.performances:
+        for artist in performance.artists:
+            stage_counts[artist.slug] = stage_counts.get(artist.slug, 0) + 1
     most = max(stage_counts.values())
     top_artists = []
     for artist_slug, count in stage_counts.items():
@@ -224,8 +220,7 @@ def main() -> None:
         # ex. ["artist", "max-pellerin"]
         run(sys.argv[1:])
     except ValueError as error:
-        message = str(error)
-        print(f"Error: {message[0].upper()}{message[1:]}")
+        print(f"Error: {error}")
         sys.exit(1)
 
 

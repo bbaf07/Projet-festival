@@ -78,6 +78,36 @@ block starts where the previous one ended.
 
 Then [step 00](B1/E00_start.md) creates your project, in its own folder.
 
+## Mes classes (étape 07)
+
+Les données du fichier sont chargées une seule fois en objets par
+`load_festival` (dans `festival.py`). Après ça, plus personne ne touche aux
+dicts du JSON : la ligne de commande (`main.py`) et l'API (`api.py`)
+utilisent les mêmes objets, donc les mêmes calculs.
+
+- **`Venue`** (dataclass) — une salle : `name`, `capacity`, `address`.
+  Calcule son `slug` (`"le-kiosque"`). `to_view()` donne le dict envoyé par
+  l'API.
+- **`Artist`** (dataclass) — un artiste : `name`, `bio`, `photo_url`. Calcule
+  son `slug`. `to_view()` pour l'API, `to_ref()` pour la forme courte
+  `{"slug", "name"}` utilisée dans un spectacle.
+- **`Performance`** (dataclass) — un spectacle : `kind`, `title`, `venue`
+  (un objet `Venue`, pas un texte), `start` (un vrai `datetime`),
+  `duration_minutes`, `description`, et les champs propres à chaque type
+  (`artist`/`min_age` pour un solo, `host`/`acts` pour un plateau,
+  `teacher`/`max_participants`/`participants` pour un atelier ; `None` sinon).
+  `__post_init__` refuse une durée hors de 1 à 360 minutes.
+  Propriétés calculées : `end`, `festival_day`, `id`, `roles`, `artists`,
+  `summary`, `places_left`. Méthodes : `involves(artist)`,
+  `is_too_close_to(other)`, `to_view()` (pour l'API), `to_dict()` (pour
+  réécrire le fichier).
+  Une seule classe pour les trois types : les `if self.kind == ...` sont
+  repérés, ils disparaîtront à l'étape 09 (héritage).
+- **`Festival`** (dataclass) — le contenant : `name`, `first_day`,
+  `last_day` (de vraies dates) et les listes de salles, d'artistes et de
+  spectacles. Les règles et les recherches restent pour l'instant des
+  fonctions du module ; l'étape 08 les rangera dans cette classe.
+
 ## Known bugs
 
 Aucun bug connu pour l'instant.
