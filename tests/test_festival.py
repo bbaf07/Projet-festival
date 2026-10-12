@@ -12,18 +12,11 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from api import app
-from errors import ConflictError, InvalidError, NotFoundError
-from festival import (
-    Artist,
-    Festival,
-    Lineup,
-    Performance,
-    SoloShow,
-    Venue,
-    Workshop,
-    load_festival,
-)
+from deauville.api import create_app
+from deauville.errors import ConflictError, InvalidError, NotFoundError
+from deauville.festival import Festival
+from deauville.models import Artist, Lineup, Performance, SoloShow, Venue, Workshop
+from deauville.storage import JsonStorage
 
 DATA_FILE = Path(__file__).parent.parent / "data" / "festival.json"
 
@@ -32,7 +25,7 @@ DATA_FILE = Path(__file__).parent.parent / "data" / "festival.json"
 # qui le demande par son nom. Les tests ne réécrivent jamais le fichier.
 @pytest.fixture
 def festival() -> Festival:
-    return load_festival(str(DATA_FILE))
+    return JsonStorage(DATA_FILE).load()
 
 
 def solo(festival: Festival, artist: str, venue: str, start: str, minutes=30):
@@ -230,7 +223,7 @@ def test_cancel(festival):
 
 
 def test_api_now():
-    client = TestClient(app)
+    client = TestClient(create_app(JsonStorage(DATA_FILE)))
     response = client.get("/api/now", params={"at": "2027-06-11T21:00"})
     assert response.status_code == 200
     body = response.json()
@@ -243,7 +236,7 @@ def test_api_now():
 
 
 def test_api_unknown_venue_is_a_404():
-    client = TestClient(app)
+    client = TestClient(create_app(JsonStorage(DATA_FILE)))
     response = client.get("/api/programme", params={"venue": "nowhere"})
     assert response.status_code == 404
     assert response.json() == {"detail": "No venue 'nowhere'."}
