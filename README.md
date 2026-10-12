@@ -80,10 +80,13 @@ Then [step 00](B1/E00_start.md) creates your project, in its own folder.
 
 ## Known bugs
 
-- **Les spectacles après minuit sont rattachés au mauvais jour.** Pour le
-  `2027-06-12`, le programme commence par `01:00 | Le Kiosque | After Hours`.
-  Le festivalier lit « samedi 1 h », alors que pour le festival c'est la fin de
-  la nuit du **vendredi** : une journée de festival se termine à 06:00. Le code
-  compare les 10 premiers caractères de `start`, ce qui ne permet pas
-  d'exprimer « avant 6 h, c'est encore la veille ». Corrigé à l'étape 04 avec
-  de vraies dates.
+Aucun bug connu pour l'instant.
+
+### Corrigés
+
+- **Étape 04 — les spectacles après minuit étaient rattachés au mauvais jour.**
+  `01:00 | Le Kiosque | After Hours` apparaissait le samedi 12, alors que pour
+  le festival c'est la fin de la nuit du **vendredi 11** (une journée se
+  termine à 06:00). Le code comparait les 10 premiers caractères de `start`.
+  Correction : on utilise de vraies dates (`datetime`), et la journée de
+  festival d'un spectacle est la date de son début **moins 6 heures**.
