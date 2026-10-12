@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin · Deauville Festival du Rire 2027</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="admin.css">
+  </head>
+  <body>
+    <header class="hero">
+      <div class="hero-inner">
+        <h1>Admin du festival</h1>
+        <p class="dates">Programmer, déplacer, annuler. Chaque règle est vérifiée par le serveur.</p>
+        <nav>
+          <a href="/">← Voir le site</a>
+          <a href="#form-section">Programmer</a>
+          <a href="#schedule-section">Programme</a>
+          <a href="#artist-section">Artistes</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="admin">
+      <section id="form-section" class="panel">
+        <h2 id="form-title">Programmer un spectacle</h2>
+        <form id="performance-form" novalidate>
+          <div class="grid">
+            <label>Type
+              <select name="kind" id="kind">
+                <option value="solo">Solo</option>
+                <option value="lineup">Plateau</option>
+                <option value="workshop">Atelier</option>
+              </select>
+            </label>
+            <label class="wide">Titre
+              <input name="title" required maxlength="120">
+            </label>
+            <label>Salle
+              <select name="venue" id="venue" required></select>
+            </label>
+            <label>Début
+              <input name="start" id="start" type="datetime-local" required>
+            </label>
+            <label>Durée (minutes)
+              <input name="duration_minutes" type="number" min="1" max="360" value="60" required>
+            </label>
+            <label class="wide">Description
+              <textarea name="description" rows="2"></textarea>
+            </label>
+          </div>
+
+          <fieldset data-kind="solo">
+            <legend>Solo</legend>
+            <div class="grid">
+              <label>Artiste
+                <select name="artist" class="artist-select"></select>
+              </label>
+              <label>Âge minimum
+                <input name="min_age" type="number" min="0" max="18" value="0">
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset data-kind="lineup" hidden>
+            <legend>Plateau</legend>
+            <div class="grid">
+              <label>Présentateur
+                <select name="host" class="artist-select"></select>
+              </label>
+            </div>
+            <p class="muted">Artistes (au moins 2 ; 10 min chacun + 3 min entre deux) :</p>
+            <div class="checks" id="acts"></div>
+          </fieldset>
+
+          <fieldset data-kind="workshop" hidden>
+            <legend>Atelier</legend>
+            <div class="grid">
+              <label>Enseignant
+                <select name="teacher" class="artist-select"></select>
+              </label>
+              <label>Places maximum
+                <input name="max_participants" type="number" min="1" value="12">
+              </label>
+            </div>
+          </fieldset>
+
+          <div class="error-box" id="form-error" hidden></div>
+          <div class="actions">
+            <button class="button primary" type="submit" id="submit-button">Programmer</button>
+            <button class="button ghost" type="button" id="cancel-edit" hidden>Annuler la modification</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="schedule-section">
+        <div class="toolbar">
+          <h2>Programme</h2>
+          <label><span class="muted">Jour</span>
+            <select id="day-filter"><option value="">Tous les jours</option></select>
+          </label>
+        </div>
+        <div id="schedule"></div>
+      </section>
+
+      <section id="artist-section" class="panel">
+        <h2>Ajouter un artiste</h2>
+        <form id="artist-form" class="grid">
+          <label>Nom
+            <input name="name" required maxlength="80">
+          </label>
+          <label>Photo (adresse, facultatif)
+            <input name="photo_url" type="url" placeholder="https://…">
+          </label>
+          <label class="wide">Biographie
+            <textarea name="bio" rows="2"></textarea>
+          </label>
+          <div class="actions wide">
+            <button class="button primary" type="submit">Ajouter l'artiste</button>
+          </div>
+        </form>
+        <p class="muted" id="artist-count"></p>
+      </section>
+    </main>
+
+    <dialog id="participants-dialog">
+      <form method="dialog" class="dialog-close"><button class="button ghost small">Fermer</button></form>
+      <h2 id="participants-title">Inscrits</h2>
+      <p class="muted" id="participants-places"></p>
+      <ul id="participants-list" class="participants"></ul>
+      <p class="error-box" id="participants-error" hidden></p>
+      <form id="participant-form" class="inline-form">
+        <input name="name" placeholder="Nom du participant" required maxlength="80">
+        <button class="button primary" type="submit">Inscrire</button>
+      </form>
+    </dialog>
+
+    <script src="/common.js"></script>
+    <script src="admin.js"></script>
+  </body>
+</html>

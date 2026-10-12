@@ -18,8 +18,14 @@ fiches et les exemples du cours qui ont guidé chaque étape.
   en lecture (programme, artistes, « sur scène maintenant ») et en écriture
   (admin : créer, déplacer, annuler, inscrire un participant, ajouter un
   artiste).
-- **Le site et l'admin** : servis par la même commande, à `/` et à `/admin/`,
-  depuis le dossier `web/` (voir _Ce qui n'est pas fait_).
+- **Le site** (`/`) : « sur scène maintenant », le programme jour par jour
+  avec un filtre par salle (badges d'âge et de places restantes), les
+  artistes et une page par artiste (`/artist.html?slug=...`).
+- **L'admin** (`/admin/`) : programmer un solo, un plateau ou un atelier,
+  le modifier ou le déplacer, l'annuler, gérer les inscrits d'un atelier,
+  ajouter un artiste. Chaque refus affiche la phrase du serveur.
+
+Astuce : `/?at=2027-06-11T21:00` affiche le site comme à ce moment-là.
 
 ## Installer
 
@@ -56,7 +62,7 @@ copie, par exemple) : `uv run deauville --data copie.json serve`.
 ## Tester
 
 ```bash
-uv run pytest                 # 135 tests
+uv run pytest                 # 136 tests
 uv run ruff format .
 uv run ruff check .
 uv build                      # dist/deauville-0.1.0-py3-none-any.whl
@@ -85,8 +91,14 @@ tests/
     test_festival.py   les règles, sur les objets
     test_api.py        le contrat de API.md, par HTTP
     test_cli.py        les sorties de la ligne de commande
+web/public/            le site : index.html, artist.html, app.js, common.js, style.css
+web/admin/             l'admin : index.html, admin.js, admin.css
 data/festival.json     l'édition 2027
 ```
+
+Le site et l'admin sont en HTML, CSS et JavaScript simples, sans outil de
+compilation. Ils ne connaissent que l'API : aucune règle n'y est recopiée, le
+navigateur affiche la réponse du serveur.
 
 Les dépendances vont dans un seul sens :
 `cli` et `api` → `storage` → `festival` → `models` → `errors` / `parsing`.
@@ -156,14 +168,12 @@ voudrait ensuite charger moins que tout le festival à chaque requête.)
 Fait : étapes 00 à 13 du cours. Ligne de commande, règles du brief,
 trois types de spectacles, encapsulation, famille d'erreurs, API complète
 (lecture et écriture), stockage derrière une interface, package installable,
-135 tests.
+un site et un admin, 136 tests.
 
 Pas fait / à savoir :
 
-- **Le site et l'admin (`web/`) ne sont pas dans le dépôt.** Le starter du
-  cours (qui les fournit avec l'`API.md` officiel) n'était pas disponible.
-  Le serveur les sert automatiquement dès qu'un dossier `web/public/` (site)
-  et `web/admin/` (admin) existe.
+- **Le site et l'admin sont les miens** : le starter du cours (qui les
+  fournit avec l'`API.md` officiel) n'était pas disponible.
 - **`API.md` est reconstitué** d'après les fiches : les champs donnés par les
   fiches sont respectés à l'identique, le reste (routes d'écriture, codes
   d'erreur) est mon choix, documenté et testé.

@@ -430,3 +430,23 @@ def test_the_api_works_with_a_storage_in_memory():
     assert client.post("/api/performances", json=solo_body()).status_code == 201
     assert len(client.get("/api/programme").json()) == 24
     assert len(data["performances"]) == 23  # le dict d'origine n'a pas bougé
+
+
+# ----- Le site et l'admin -----
+
+WEB_DIR = Path(__file__).parent.parent / "web"
+
+
+def test_the_website_and_the_admin_are_served(data_file):
+    client = TestClient(create_app(JsonStorage(data_file), web_dir=WEB_DIR))
+    for url, text in [
+        ("/", "Sur scène maintenant"),
+        ("/artist.html?slug=max-pellerin", "Sur scène"),
+        ("/admin/", "Programmer un spectacle"),
+        ("/common.js", "async function api"),
+    ]:
+        response = client.get(url)
+        assert response.status_code == 200, url
+        assert text in response.text, url
+    # Les routes de l'API passent toujours avant les fichiers du site.
+    assert client.get("/api/venues").status_code == 200

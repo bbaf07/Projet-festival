@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Deauville Festival du Rire 2027</title>
+    <link rel="stylesheet" href="/style.css">
+  </head>
+  <body>
+    <header class="hero">
+      <div class="hero-inner">
+        <h1 id="festival-name">Deauville Festival du Rire</h1>
+        <p class="dates" id="festival-dates"></p>
+        <nav>
+          <a href="#programme">Programme</a>
+          <a href="#artistes">Artistes</a>
+          <a href="/admin/">Admin</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="now" id="now" aria-live="polite">
+        <h2><span class="live-dot"></span> Sur scène maintenant</h2>
+        <div class="now-playing" id="now-playing"></div>
+        <strong>Ensuite</strong>
+        <ul class="up-next" id="up-next"></ul>
+      </section>
+
+      <section id="programme">
+        <h2>Programme</h2>
+        <div class="toolbar">
+          <div class="tabs" id="day-tabs" role="tablist"></div>
+          <label>
+            <span class="muted">Salle</span>
+            <select id="venue-filter">
+              <option value="">Toutes les salles</option>
+            </select>
+          </label>
+        </div>
+        <div class="cards" id="programme-cards"></div>
+      </section>
+
+      <section id="artistes">
+        <h2>Les artistes</h2>
+        <div class="artists" id="artist-grid"></div>
+      </section>
+    </main>
+
+    <footer>Deauville Festival du Rire 2027 · 10–13 juin · Deauville</footer>
+
+    <script src="/common.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>

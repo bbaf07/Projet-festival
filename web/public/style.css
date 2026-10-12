@@ -1,0 +1,454 @@
+/* Deauville Festival du Rire 2027 — styles partagés par le site et l'admin. */
+
+:root {
+  --ink: #1b2240;
+  --ink-soft: #4a5275;
+  --paper: #fbf7f0;
+  --card: #ffffff;
+  --line: #e7e0d3;
+  --coral: #ff5a4e;
+  --coral-dark: #d63b30;
+  --sun: #ffc93c;
+  --sea: #2f7f9e;
+  --green: #2e8b57;
+  --shadow: 0 2px 10px rgba(27, 34, 64, 0.08);
+  --radius: 14px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --display: Georgia, "Times New Roman", serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font);
+  line-height: 1.5;
+}
+
+a {
+  color: var(--sea);
+}
+
+/* ----- En-tête ----- */
+
+.hero {
+  background: var(--ink);
+  color: #fff;
+  padding: 28px 16px 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::after {
+  /* les rayures d'une cabine de plage */
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 8px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--coral) 0 24px,
+    #fff 24px 48px
+  );
+}
+
+.hero-inner,
+main {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.hero h1 {
+  font-family: var(--display);
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  margin: 0 0 4px;
+  letter-spacing: -0.5px;
+}
+
+.hero .dates {
+  color: var(--sun);
+  font-weight: 600;
+  margin: 0;
+}
+
+.hero nav {
+  margin-top: 14px;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.hero nav a {
+  color: #fff;
+  opacity: 0.85;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.hero nav a:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+main {
+  padding: 24px 16px 60px;
+}
+
+section {
+  margin-bottom: 40px;
+}
+
+h2 {
+  font-family: var(--display);
+  font-size: 1.6rem;
+  margin: 0 0 14px;
+}
+
+.muted {
+  color: var(--ink-soft);
+}
+
+/* ----- Sur scène maintenant ----- */
+
+.now {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 18px 20px;
+  border-left: 6px solid var(--coral);
+}
+
+.now h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.live-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--coral);
+  animation: pulse 1.6s infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.now-playing {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.now-item {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.up-next {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.up-next li {
+  color: var(--ink-soft);
+}
+
+.up-next time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--ink);
+  margin-right: 6px;
+}
+
+/* ----- Onglets des jours et filtre ----- */
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tab {
+  border: 2px solid var(--ink);
+  background: transparent;
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 6px 16px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tab[aria-selected="true"] {
+  background: var(--ink);
+  color: #fff;
+}
+
+select,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fff;
+}
+
+/* ----- Cartes de spectacles ----- */
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 5px solid var(--sea);
+}
+
+.card.kind-solo {
+  border-top-color: var(--coral);
+}
+
+.card.kind-lineup {
+  border-top-color: var(--sun);
+}
+
+.card.kind-workshop {
+  border-top-color: var(--green);
+}
+
+.card .time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.card h3 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.card .venue {
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+.card .summary {
+  margin: 0;
+}
+
+.card .description {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+}
+
+.badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 6px;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #eef1f8;
+  color: var(--ink);
+}
+
+.badge.age {
+  background: var(--ink);
+  color: #fff;
+}
+
+.badge.places {
+  background: #e3f4ea;
+  color: var(--green);
+}
+
+.badge.full {
+  background: #fde4e2;
+  color: var(--coral-dark);
+}
+
+.empty {
+  padding: 30px;
+  text-align: center;
+  color: var(--ink-soft);
+  background: var(--card);
+  border-radius: var(--radius);
+}
+
+/* ----- Artistes ----- */
+
+.artists {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+}
+
+.artist {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px;
+  text-align: center;
+  text-decoration: none;
+  color: var(--ink);
+  transition: transform 0.15s;
+}
+
+.artist:hover {
+  transform: translateY(-3px);
+}
+
+.avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  margin: 0 auto 10px;
+  display: grid;
+  place-items: center;
+  font-family: var(--display);
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--sea);
+  object-fit: cover;
+}
+
+.artist-header {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.artist-header .avatar {
+  width: 110px;
+  height: 110px;
+  font-size: 2.4rem;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+/* ----- Boutons et messages (utilisés surtout par l'admin) ----- */
+
+.button {
+  border: none;
+  border-radius: 8px;
+  padding: 9px 16px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--ink);
+  color: #fff;
+}
+
+.button.primary {
+  background: var(--coral);
+}
+
+.button.primary:hover {
+  background: var(--coral-dark);
+}
+
+.button.ghost {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.button.danger {
+  background: transparent;
+  color: var(--coral-dark);
+  border: 1px solid #f3c3bf;
+}
+
+.button.small {
+  padding: 4px 10px;
+  font-size: 0.85rem;
+}
+
+.error-box {
+  background: #fde4e2;
+  color: var(--coral-dark);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-weight: 600;
+}
+
+#toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  max-width: calc(100% - 32px);
+  z-index: 10;
+}
+
+#toast.error {
+  background: var(--coral-dark);
+}
+
+#toast[hidden] {
+  display: none;
+}
+
+footer {
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  padding: 20px 16px 40px;
+}
+
+@media (max-width: 600px) {
+  .artist-header {
+    flex-direction: column;
+    text-align: center;
+  }
+}

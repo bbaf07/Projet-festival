@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Artiste · Deauville Festival du Rire 2027</title>
+    <link rel="stylesheet" href="/style.css">
+  </head>
+  <body>
+    <header class="hero">
+      <div class="hero-inner">
+        <h1>Deauville Festival du Rire</h1>
+        <p class="dates">10 – 13 juin 2027</p>
+        <nav>
+          <a href="/">← Programme</a>
+          <a href="/#artistes">Tous les artistes</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <div class="artist-header" id="artist-header"></div>
+      <section>
+        <h2>Sur scène</h2>
+        <div class="cards" id="artist-performances"></div>
+      </section>
+    </main>
+
+    <footer>Deauville Festival du Rire 2027 · 10–13 juin · Deauville</footer>
+
+    <script src="/common.js"></script>
+    <script>
+      // La page d'un artiste : /artist.html?slug=max-pellerin
+      async function showArtist() {
+        const slug = new URLSearchParams(location.search).get("slug") || "";
+        const header = document.getElementById("artist-header");
+        try {
+          const artist = await api(`/api/artists/${encodeURIComponent(slug)}`);
+          document.title = `${artist.name} · Deauville Festival du Rire 2027`;
+          header.innerHTML = `${avatarHtml(artist)}
+            <div><h2>${esc(artist.name)}</h2>
+            <p class="muted">${esc(artist.bio || "")}</p></div>`;
+          document.getElementById("artist-performances").innerHTML =
+            artist.performances.map((p) => performanceCard(p, { showDay: true })).join("");
+        } catch (error) {
+          header.innerHTML = `<div class="error-box">${esc(error.message)}</div>`;
+        }
+      }
+      showArtist();
+    </script>
+  </body>
+</html>
