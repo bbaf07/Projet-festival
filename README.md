@@ -103,10 +103,36 @@ utilisent les mêmes objets, donc les mêmes calculs.
   réécrire le fichier).
   Une seule classe pour les trois types : les `if self.kind == ...` sont
   repérés, ils disparaîtront à l'étape 09 (héritage).
-- **`Festival`** (dataclass) — le contenant : `name`, `first_day`,
-  `last_day` (de vraies dates) et les listes de salles, d'artistes et de
-  spectacles. Les règles et les recherches restent pour l'instant des
-  fonctions du module ; l'étape 08 les rangera dans cette classe.
+- **`Festival`** (classe, étape 08) — le festival entier et ses règles :
+  `name`, `first_day`, `last_day`, et des collections privées
+  (`_venues`, `_artists` rangés par identifiant, `_performances`). On ne
+  touche jamais ces collections directement : les propriétés `venues`,
+  `artists`, `performances` rendent des copies, et la seule façon d'ajouter
+  est `add_performance()`, qui appelle `check()` (toutes les règles). Le
+  fichier lui-même est chargé par ces méthodes, donc vérifié aussi.
+  Méthodes : `venue()`, `artist()`, `performance()`, `days()`,
+  `programme(day, venue)`, `performances_of(artist)`, `on_stage_at(moment)`,
+  `next_after(moment)`, `cancel(id)`, `to_dict()`.
+
+Méthodes spéciales : `Performance.__lt__` (tri par début puis nom de salle,
+utilisé par `sorted()`), `Performance.__str__` (la ligne affichée par la
+ligne de commande), `Artist.__eq__` et `Venue.__eq__` (même identifiant =
+même objet).
+
+## Tests
+
+```bash
+uv run python -m pytest
+```
+
+`tests/test_festival.py` prouve chaque règle du brief : salle occupée,
+artiste occupé dans une autre salle, artiste occupé comme « act » d'un
+plateau, spectacle à 01:00 rattaché à la veille, jour hors festival, durée
+de 0 ou 361 minutes, salle ou artiste inconnus.
+
+> Sur ce PC, Windows bloque les lanceurs `.exe` de `.venv` : on lance
+> `uv run python -m pytest` et `uv run python -m uvicorn api:app --reload`
+> au lieu de `uv run pytest` et `uv run uvicorn ...`.
 
 ## Known bugs
 

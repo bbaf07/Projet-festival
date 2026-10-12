@@ -55,6 +55,13 @@ class Venue:
         """Se lit comme un attribut (venue.slug), mais est calculé à chaque fois."""
         return slugify(self.name)
 
+    def __eq__(self, other: object) -> bool:
+        """Deux salles sont la même si elles ont le même identifiant."""
+        return isinstance(other, Venue) and self.slug == other.slug
+
+    def __hash__(self) -> int:
+        return hash(self.slug)
+
     def to_view(self) -> dict:
         """Ce que l'API envoie pour une salle."""
         return {
@@ -76,6 +83,13 @@ class Artist:
     @property
     def slug(self) -> str:
         return slugify(self.name)
+
+    def __eq__(self, other: object) -> bool:
+        """Deux artistes sont le même s'ils ont le même identifiant (slug)."""
+        return isinstance(other, Artist) and self.slug == other.slug
+
+    def __hash__(self) -> int:
+        return hash(self.slug)
 
     def to_ref(self) -> dict:
         """La forme courte, utilisée dans un spectacle : {"slug", "name"}."""
@@ -181,6 +195,17 @@ class Performance:
         """Vrai si les deux spectacles se chevauchent ou sont à moins de 30 min."""
         return self.start < other.end + GAP and other.start < self.end + GAP
 
+    def __lt__(self, other: "Performance") -> bool:
+        """sorted() utilise < : par début, puis par nom de salle."""
+        return (self.start, self.venue.name) < (other.start, other.venue.name)
+
+    def __str__(self) -> str:
+        """Ce qu'affiche print() : "21:30-22:40 | Salle | Titre (type)"."""
+        return (
+            f"{self.start:%H:%M}-{self.end:%H:%M} | {self.venue.name} | "
+            f"{self.title} ({self.kind})"
+        )
+
     def to_view(self) -> dict:
         """Ce que l'API envoie : des valeurs simples, les valeurs calculées incluses."""
         view = {
@@ -234,24 +259,203 @@ class Performance:
         return data
 
 
-@dataclass
 class Festival:
-    """Le contenant : le festival, ses salles, ses artistes, ses spectacles."""
+    """Le festival entier : ses salles, ses artistes, ses spectacles et ses règles.
 
-    name: str
-    first_day: date
-    last_day: date
-    venues: list[Venue]
-    artists: list[Artist]
-    performances: list[Performance]
+    Les listes sont "privées" (le _ devant le nom) : on passe toujours par les
+    méthodes, donc les règles s'appliquent toujours.
+    """
+
+    def __init__(self, name: str, first_day: date, last_day: date) -> None:
+        self.name = name
+        self.first_day = first_day
+        self.last_day = last_day
+        # Rangés par identifiant : on les retrouve en une étape.
+        self._venues: dict[str, Venue] = {}
+        self._artists: dict[str, Artist] = {}
+        self._performances: list[Performance] = []
+
+    # --- Lire le contenu (des copies : modifier la liste rendue ne change rien) ---
+
+    @property
+    def venues(self) -> list[Venue]:
+        """Les salles, dans l'ordre du fichier."""
+        return list(self._venues.values())
+
+    @property
+    def artists(self) -> list[Artist]:
+        """Les artistes, dans l'ordre du fichier."""
+        return list(self._artists.values())
+
+    @property
+    def performances(self) -> list[Performance]:
+        """Tous les spectacles, dans l'ordre du fichier."""
+        return list(self._performances)
+
+    @property
+    def total_seats(self) -> int:
+        """Le nombre total de places, toutes salles confondues."""
+        total = 0
+        for venue in self._venues.values():
+            total += venue.capacity
+        return total
+
+    # --- Rechercher ---
+
+    def find_venue(self, slug: str) -> Venue | None:
+        """La salle qui a cet identifiant, ou None."""
+        return self._venues.get(slug)
+
+    def venue(self, slug: str) -> Venue:
+        """La salle qui a cet identifiant, ou ValueError."""
+        if slug not in self._venues:
+            raise ValueError(f"No venue {slug!r}.")
+        return self._venues[slug]
+
+    def find_artist(self, slug: str) -> Artist | None:
+        """L'artiste qui a cet identifiant, ou None."""
+        return self._artists.get(slug)
+
+    def artist(self, slug: str) -> Artist:
+        """L'artiste qui a cet identifiant, ou ValueError."""
+        if slug not in self._artists:
+            raise ValueError(f"No artist {slug!r}.")
+        return self._artists[slug]
+
+    def performance(self, performance_id: str) -> Performance:
+        """Le spectacle qui a cet identifiant, ou ValueError."""
+        for performance in self._performances:
+            if performance.id == performance_id:
+                return performance
+        raise ValueError(f"No performance {performance_id!r}.")
+
+    def days(self) -> list[date]:
+        """Les journées de festival où il y a au moins un spectacle, triées."""
+        days = []
+        for performance in self._performances:
+            if performance.festival_day not in days:
+                days.append(performance.festival_day)
+        return sorted(days)
+
+    def programme(
+        self, day: date | None = None, venue: Venue | None = None
+    ) -> list[Performance]:
+        """Les spectacles, filtrés par journée et/ou par salle, triés.
+
+        sorted() utilise Performance.__lt__ : par début, puis par nom de salle.
+        """
+        result = []
+        for performance in self._performances:
+            if day is not None and performance.festival_day != day:
+                continue
+            if venue is not None and performance.venue != venue:
+                continue
+            result.append(performance)
+        return sorted(result)
+
+    def performances_of(self, artist: Artist) -> list[tuple[Performance, str]]:
+        """Les spectacles d'un artiste, triés, avec son rôle dans chacun."""
+        result = []
+        for performance in self.programme():
+            for other, role in performance.roles:
+                if other == artist:
+                    result.append((performance, role))
+        return result
+
+    def on_stage_at(self, moment: datetime) -> list[Performance]:
+        """Les spectacles en cours à ce moment : commencés, pas encore finis."""
+        on_stage = []
+        for performance in self._performances:
+            if performance.start <= moment < performance.end:
+                on_stage.append(performance)
+        return sorted(on_stage)
+
+    def next_after(self, moment: datetime, count: int = 3) -> list[Performance]:
+        """Les `count` prochains spectacles qui commencent après ce moment."""
+        upcoming = []
+        for performance in self._performances:
+            if performance.start > moment:
+                upcoming.append(performance)
+        return sorted(upcoming)[:count]
+
+    # --- Modifier : la seule porte d'entrée, chaque règle est vérifiée ---
+
+    def add_venue(self, venue: Venue) -> None:
+        if venue.slug in self._venues:
+            raise ValueError(f"{venue.name} is already a venue.")
+        self._venues[venue.slug] = venue
+
+    def add_artist(self, artist: Artist) -> None:
+        if artist.slug in self._artists:
+            raise ValueError(f"{artist.name} is already an artist.")
+        self._artists[artist.slug] = artist
+
+    def check(self, new: Performance) -> None:
+        """Vérifie un nouveau spectacle avec les règles du brief.
+
+        La durée est déjà vérifiée à la création de l'objet (__post_init__).
+        Ne renvoie rien si tout va bien ; lève ValueError avec une phrase sinon.
+        """
+        if self._venues.get(new.venue.slug) != new.venue:
+            raise ValueError(f"No venue {new.venue.slug!r}.")
+        for artist in new.artists:
+            if self._artists.get(artist.slug) != artist:
+                raise ValueError(f"No artist {artist.slug!r}.")
+
+        if not self.first_day <= new.festival_day <= self.last_day:
+            raise ValueError(f"{new.festival_day} is not a day of the festival.")
+
+        for other in self._performances:
+            if not new.is_too_close_to(other):
+                continue
+            if other.venue == new.venue:
+                raise ValueError(
+                    f"{new.venue.name} is busy with {other.title} "
+                    f"({other.start:%Y-%m-%d %H:%M}-{other.end:%H:%M})."
+                )
+            for artist in new.artists:
+                if other.involves(artist):
+                    raise ValueError(f"{artist.name} is on stage in {other.title}.")
+
+    def add_performance(self, new: Performance) -> None:
+        """Vérifie puis ajoute. Si une règle est enfreinte, rien n'est ajouté."""
+        self.check(new)
+        self._performances.append(new)
+
+    def cancel(self, performance_id: str) -> Performance:
+        """Retire un spectacle et le renvoie (ValueError s'il n'existe pas)."""
+        performance = self.performance(performance_id)
+        self._performances.remove(performance)
+        return performance
+
+    # --- Vers le fichier ---
+
+    def to_dict(self) -> dict:
+        """La forme du fichier JSON, pour le réécrire."""
+        return {
+            "name": self.name,
+            "first_day": self.first_day.isoformat(),
+            "last_day": self.last_day.isoformat(),
+            "venues": [
+                {"name": v.name, "capacity": v.capacity, "address": v.address}
+                for v in self._venues.values()
+            ],
+            "artists": [
+                {"name": a.name, "bio": a.bio, "photo_url": a.photo_url}
+                for a in self._artists.values()
+            ],
+            "performances": [p.to_dict() for p in self._performances],
+        }
 
 
 # ----- Lecture et sauvegarde : JSON <-> objets -----
 
 
 def load_festival(path: str) -> Festival:
-    """Lit le fichier JSON et renvoie des objets.
+    """Lit le fichier JSON et renvoie l'objet Festival.
 
+    Tout passe par les méthodes add_... : les données du fichier sont
+    vérifiées avec les mêmes règles qu'un ajout à la main.
     Lève ValueError avec une phrase claire si le fichier manque ou est abîmé.
     """
     try:
@@ -264,18 +468,17 @@ def load_festival(path: str) -> Festival:
             f"The data file {path} is damaged (line {error.lineno})."
         ) from None
 
-    venues = [Venue(v["name"], v["capacity"], v["address"]) for v in data["venues"]]
-    artists = [Artist(a["name"], a["bio"], a["photo_url"]) for a in data["artists"]]
     festival = Festival(
-        name=data["name"],
-        first_day=date.fromisoformat(data["first_day"]),
-        last_day=date.fromisoformat(data["last_day"]),
-        venues=venues,
-        artists=artists,
-        performances=[],
+        data["name"],
+        date.fromisoformat(data["first_day"]),
+        date.fromisoformat(data["last_day"]),
     )
+    for row in data["venues"]:
+        festival.add_venue(Venue(row["name"], row["capacity"], row["address"]))
+    for row in data["artists"]:
+        festival.add_artist(Artist(row["name"], row["bio"], row["photo_url"]))
     for row in data["performances"]:
-        festival.performances.append(performance_from_dict(festival, row))
+        festival.add_performance(performance_from_dict(festival, row))
     return festival
 
 
@@ -285,19 +488,19 @@ def performance_from_dict(festival: Festival, row: dict) -> Performance:
     performance = Performance(
         kind=kind,
         title=row["title"],
-        venue=get_venue(festival, row["venue"]),
+        venue=festival.venue(row["venue"]),
         start=datetime.fromisoformat(row["start"]),
         duration_minutes=row["duration_minutes"],
         description=row["description"],
     )
     if kind == "solo":
-        performance.artist = get_artist(festival, row["artist"])
+        performance.artist = festival.artist(row["artist"])
         performance.min_age = row["min_age"]
     elif kind == "lineup":
-        performance.host = get_artist(festival, row["host"])
-        performance.acts = [get_artist(festival, slug) for slug in row["acts"]]
+        performance.host = festival.artist(row["host"])
+        performance.acts = [festival.artist(slug) for slug in row["acts"]]
     elif kind == "workshop":
-        performance.teacher = get_artist(festival, row["teacher"])
+        performance.teacher = festival.artist(row["teacher"])
         performance.max_participants = row["max_participants"]
         performance.participants = row["participants"]
     return performance
@@ -305,24 +508,10 @@ def performance_from_dict(festival: Festival, row: dict) -> Performance:
 
 def save_festival(festival: Festival, path: str) -> None:
     """Objets -> JSON : réécrit le fichier avec les données à jour."""
-    data = {
-        "name": festival.name,
-        "first_day": festival.first_day.isoformat(),
-        "last_day": festival.last_day.isoformat(),
-        "venues": [
-            {"name": v.name, "capacity": v.capacity, "address": v.address}
-            for v in festival.venues
-        ],
-        "artists": [
-            {"name": a.name, "bio": a.bio, "photo_url": a.photo_url}
-            for a in festival.artists
-        ],
-        "performances": [p.to_dict() for p in festival.performances],
-    }
     # newline="\n" : fins de ligne LF comme le fichier d'origine (pas CRLF Windows).
     with open(path, "w", encoding="utf-8", newline="\n") as f:
         # ensure_ascii=False garde "é" lisible, indent=2 garde le fichier lisible.
-        json.dump(data, f, ensure_ascii=False, indent=2)
+        json.dump(festival.to_dict(), f, ensure_ascii=False, indent=2)
         f.write("\n")
 
 
@@ -351,151 +540,3 @@ def parse_minutes(text: str) -> int:
         return int(text)
     except ValueError:
         raise ValueError(f"{text!r} is not a number of minutes.") from None
-
-
-# ----- Rechercher dans le festival -----
-
-
-def find_venue(festival: Festival, slug: str) -> Venue | None:
-    """La salle qui a cet identifiant, ou None."""
-    for venue in festival.venues:
-        if venue.slug == slug:
-            return venue
-    return None
-
-
-def get_venue(festival: Festival, slug: str) -> Venue:
-    """La salle qui a cet identifiant, ou ValueError."""
-    venue = find_venue(festival, slug)
-    if venue is None:
-        raise ValueError(f"No venue {slug!r}.")
-    return venue
-
-
-def find_artist(festival: Festival, slug: str) -> Artist | None:
-    """L'artiste qui a cet identifiant, ou None."""
-    for artist in festival.artists:
-        if artist.slug == slug:
-            return artist
-    return None
-
-
-def get_artist(festival: Festival, slug: str) -> Artist:
-    """L'artiste qui a cet identifiant, ou ValueError."""
-    artist = find_artist(festival, slug)
-    if artist is None:
-        raise ValueError(f"No artist {slug!r}.")
-    return artist
-
-
-def get_performance(festival: Festival, performance_id: str) -> Performance:
-    """Le spectacle qui a cet identifiant, ou ValueError."""
-    for performance in festival.performances:
-        if performance.id == performance_id:
-            return performance
-    raise ValueError(f"No performance {performance_id!r}.")
-
-
-def festival_days(festival: Festival) -> list[date]:
-    """Les journées de festival où il y a au moins un spectacle, triées."""
-    days = []
-    for performance in festival.performances:
-        if performance.festival_day not in days:
-            days.append(performance.festival_day)
-    return sorted(days)
-
-
-def by_start(performance: Performance) -> datetime:
-    """Clé de tri : l'heure de début."""
-    return performance.start
-
-
-def programme(
-    festival: Festival, day: date | None = None, venue: Venue | None = None
-) -> list[Performance]:
-    """Les spectacles, filtrés par journée et/ou par salle, triés par début."""
-    result = []
-    for performance in festival.performances:
-        if day is not None and performance.festival_day != day:
-            continue
-        if venue is not None and performance.venue != venue:
-            continue
-        result.append(performance)
-    return sorted(result, key=by_start)
-
-
-def on_stage_at(festival: Festival, moment: datetime) -> list[Performance]:
-    """Les spectacles en cours à ce moment : commencés, pas encore finis."""
-    on_stage = []
-    for performance in festival.performances:
-        if performance.start <= moment < performance.end:
-            on_stage.append(performance)
-    return sorted(on_stage, key=by_start)
-
-
-def next_after(festival: Festival, moment: datetime, count: int) -> list[Performance]:
-    """Les `count` prochains spectacles qui commencent après ce moment."""
-    upcoming = []
-    for performance in festival.performances:
-        if performance.start > moment:
-            upcoming.append(performance)
-    return sorted(upcoming, key=by_start)[:count]
-
-
-def performances_of_artist(
-    festival: Festival, artist: Artist
-) -> list[tuple[Performance, str]]:
-    """Les spectacles d'un artiste, triés par date, avec son rôle dans chacun."""
-    result = []
-    for performance in programme(festival):
-        for other, role in performance.roles:
-            if other == artist:
-                result.append((performance, role))
-    return result
-
-
-def total_seats(festival: Festival) -> int:
-    """Le nombre total de places, toutes salles confondues."""
-    total = 0
-    for venue in festival.venues:
-        total += venue.capacity
-    return total
-
-
-# ----- Les règles : vérifier, ajouter, annuler -----
-
-
-def check_performance(festival: Festival, new: Performance) -> None:
-    """Vérifie un nouveau spectacle avec les règles du brief.
-
-    La salle, les artistes et la durée sont déjà vérifiés à la création de
-    l'objet. Ici : le jour, puis les 30 minutes pour la salle et les artistes.
-    Ne renvoie rien si tout va bien ; lève ValueError avec une phrase sinon.
-    """
-    if not festival.first_day <= new.festival_day <= festival.last_day:
-        raise ValueError(f"{new.festival_day} is not a day of the festival.")
-
-    for other in festival.performances:
-        if not new.is_too_close_to(other):
-            continue
-        if other.venue == new.venue:
-            raise ValueError(
-                f"{new.venue.name} is busy with {other.title} "
-                f"({other.start:%Y-%m-%d %H:%M}-{other.end:%H:%M})."
-            )
-        for artist in new.artists:
-            if other.involves(artist):
-                raise ValueError(f"{artist.name} is on stage in {other.title}.")
-
-
-def add_performance(festival: Festival, new: Performance) -> None:
-    """Vérifie puis ajoute. Si la vérification lève une erreur, rien n'est ajouté."""
-    check_performance(festival, new)
-    festival.performances.append(new)
-
-
-def cancel_performance(festival: Festival, performance_id: str) -> Performance:
-    """Retire un spectacle et le renvoie (ValueError s'il n'existe pas)."""
-    performance = get_performance(festival, performance_id)
-    festival.performances.remove(performance)
-    return performance

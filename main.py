@@ -17,22 +17,11 @@ from festival import (
     DATA_FILE,
     Festival,
     Performance,
-    add_performance,
-    cancel_performance,
-    festival_days,
-    find_artist,
-    get_artist,
-    get_venue,
     load_festival,
-    next_after,
-    on_stage_at,
     parse_day,
     parse_minutes,
     parse_moment,
-    performances_of_artist,
-    programme,
     save_festival,
-    total_seats,
 )
 
 # ----- Fonctions qui affichent : une par commande, en bout de chaîne -----
@@ -51,36 +40,28 @@ def show_summary(festival: Festival) -> None:
 def show_venues(festival: Festival) -> None:
     for venue in festival.venues:
         print(f"{venue.slug}: {venue.name}, {venue.capacity} seats")
-    print(f"Total: {total_seats(festival)} seats")
-
-
-def performance_line(performance: Performance) -> str:
-    """Une ligne de programme : "21:30-22:40 | Salle | Titre (type)"."""
-    return (
-        f"{performance.start:%H:%M}-{performance.end:%H:%M} | "
-        f"{performance.venue.name} | {performance.title} ({performance.kind})"
-    )
+    print(f"Total: {festival.total_seats} seats")
 
 
 def show_programme(festival: Festival, day_text: str) -> None:
     day = parse_day(day_text)
-    days = festival_days(festival)
+    days = festival.days()
     if day not in days:
         days_text = ", ".join(str(festival_day) for festival_day in days)
         print(f"No performance on {day_text!r}. Days: {days_text}")
         return
     print(f"Programme for {day:%A %d %B}:")
-    for performance in programme(festival, day=day):
-        print(performance_line(performance))
+    for performance in festival.programme(day=day):
+        print(performance)  # print() utilise Performance.__str__
 
 
 def show_artist(festival: Festival, slug: str) -> None:
-    artist = find_artist(festival, slug)
+    artist = festival.find_artist(slug)
     if artist is None:
         print(f"No artist {slug!r}.")
         return
     print(artist.name)
-    for performance, role in performances_of_artist(festival, artist):
+    for performance, role in festival.performances_of(artist):
         print(
             f"{performance.festival_day:%a %d} "
             f"{performance.start:%H:%M}-{performance.end:%H:%M} | "
@@ -91,14 +72,14 @@ def show_artist(festival: Festival, slug: str) -> None:
 def show_now(festival: Festival, moment_text: str) -> None:
     moment = parse_moment(moment_text)
     print(f"On stage at {moment:%Y-%m-%d %H:%M}:")
-    for performance in on_stage_at(festival, moment):
+    for performance in festival.on_stage_at(moment):
         print(
             f"- {performance.title} at {performance.venue.name}, "
             f"until {performance.end:%H:%M}"
         )
     print("Up next:")
-    for performance in next_after(festival, moment, 3):
-        print(f"- {performance_line(performance)}")
+    for performance in festival.next_after(moment, 3):
+        print(f"- {performance}")
 
 
 def ask_and_add(festival: Festival) -> None:
@@ -108,25 +89,25 @@ def ask_and_add(festival: Festival) -> None:
     venue_slug = input("Venue (slug): ").strip()
     start = parse_moment(input("Start (YYYY-MM-DDTHH:MM): ").strip())
     duration = parse_minutes(input("Duration (minutes): ").strip())
-    # get_venue / get_artist lèvent une erreur si l'identifiant est inconnu,
+    # venue() / artist() lèvent une erreur si l'identifiant est inconnu,
     # et Performance(...) refuse une durée hors des règles (__post_init__).
     new = Performance(
         kind="solo",
         title=title,
-        venue=get_venue(festival, venue_slug),
+        venue=festival.venue(venue_slug),
         start=start,
         duration_minutes=duration,
-        artist=get_artist(festival, artist_slug),
+        artist=festival.artist(artist_slug),
         min_age=0,
     )
-    add_performance(festival, new)
+    festival.add_performance(new)  # vérifie toutes les règles avant d'ajouter
     save_festival(festival, DATA_FILE)
     print(f"Added: {new.id}")
 
 
 def cancel_and_save(festival: Festival, performance_id: str) -> None:
     """Commande cancel : retire le spectacle puis sauvegarde."""
-    cancelled = cancel_performance(festival, performance_id)
+    cancelled = festival.cancel(performance_id)
     save_festival(festival, DATA_FILE)
     print(f"Cancelled: {cancelled.title}")
 
@@ -137,7 +118,7 @@ def show_explore(festival: Festival) -> None:
     print("Venues:")
     for venue in festival.venues:
         print(f"- {venue.name}: {venue.capacity} seats ({venue.address})")
-    print(f"Total: {total_seats(festival)} seats")
+    print(f"Total: {festival.total_seats} seats")
 
     # 2. Nombre de spectacles par type
     print()

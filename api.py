@@ -5,22 +5,13 @@
 Puis ouvrir http://127.0.0.1:8000 (le site) et http://127.0.0.1:8000/docs
 """
 
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 
-from festival import (
-    DATA_FILE,
-    festival_days,
-    find_artist,
-    find_venue,
-    get_performance,
-    load_festival,
-    performances_of_artist,
-    programme,
-)
+from festival import DATA_FILE, load_festival
 
 WEBSITE = Path("web/public")
 
@@ -36,7 +27,7 @@ def read_festival() -> dict:
         "name": festival.name,
         "first_day": festival.first_day.isoformat(),
         "last_day": festival.last_day.isoformat(),
-        "days": [day.isoformat() for day in festival_days(festival)],
+        "days": [day.isoformat() for day in festival.days()],
     }
 
 
@@ -57,13 +48,12 @@ def list_artists() -> list[dict]:
 @app.get("/api/artists/{slug}")
 def read_artist(slug: str) -> dict:
     festival = load_festival(DATA_FILE)
-    artist = find_artist(festival, slug)
+    artist = festival.find_artist(slug)
     if artist is None:
         raise HTTPException(status_code=404, detail=f"No artist {slug!r}.")
     view = artist.to_view()
     view["performances"] = [
-        performance.to_view()
-        for performance, _role in performances_of_artist(festival, artist)
+        performance.to_view() for performance, _role in festival.performances_of(artist)
     ]
     return view
 
@@ -75,10 +65,10 @@ def list_programme(day: date | None = None, venue: str | None = None) -> list[di
     festival = load_festival(DATA_FILE)
     venue_object = None
     if venue is not None:
-        venue_object = find_venue(festival, venue)
+        venue_object = festival.find_venue(venue)
         if venue_object is None:
             raise HTTPException(status_code=404, detail=f"No venue {venue!r}.")
-    performances = programme(festival, day=day, venue=venue_object)
+    performances = festival.programme(day=day, venue=venue_object)
     return [performance.to_view() for performance in performances]
 
 
@@ -86,9 +76,22 @@ def list_programme(day: date | None = None, venue: str | None = None) -> list[di
 def read_performance(performance_id: str) -> dict:
     festival = load_festival(DATA_FILE)
     try:
-        return get_performance(festival, performance_id).to_view()
+        return festival.performance(performance_id).to_view()
     except ValueError as error:
         raise HTTPException(status_code=404, detail=str(error)) from None
+
+
+# ?at=2027-06-11T21:00 remplace l'heure actuelle (pratique pour tester).
+@app.get("/api/now")
+def read_now(at: datetime | None = None) -> dict:
+    festival = load_festival(DATA_FILE)
+    if at is None:
+        at = datetime.now()
+    return {
+        "at": f"{at:%Y-%m-%dT%H:%M}",
+        "now_playing": [p.to_view() for p in festival.on_stage_at(at)],
+        "up_next": [p.to_view() for p in festival.next_after(at, 3)],
+    }
 
 
 # Le site, servi à "/". Après les routes, sinon il les cacherait.
