@@ -13,6 +13,7 @@ uv run main.py cancel ID               annuler un spectacle
 
 import sys
 
+from errors import FestivalError
 from festival import (
     DATA_FILE,
     Festival,
@@ -195,12 +196,12 @@ def run(arguments: list[str]) -> None:
 
 def main() -> None:
     # Les erreurs sont attrapées ici, à un seul endroit : les autres fonctions
-    # se contentent de lever ValueError avec une phrase.
+    # se contentent de lever une erreur de la famille FestivalError.
     try:
         # sys.argv : les mots tapés après le nom du fichier,
         # ex. ["artist", "max-pellerin"]
         run(sys.argv[1:])
-    except ValueError as error:
+    except FestivalError as error:  # un seul except pour toute la famille
         print(f"Error: {error}")
         sys.exit(1)
 

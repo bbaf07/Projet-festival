@@ -13,6 +13,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api import app
+from errors import ConflictError, InvalidError, NotFoundError
 from festival import (
     Artist,
     Festival,
@@ -131,7 +132,7 @@ def test_a_valid_performance_is_added(festival):
 def test_venue_busy(festival):
     # After Hours occupe le Kiosque de 01:00 à 02:00, donc pas avant 02:30.
     new = solo(festival, "karim-benali", "le-kiosque", "2027-06-12T02:15")
-    with pytest.raises(ValueError, match="Le Kiosque is busy with After Hours"):
+    with pytest.raises(ConflictError, match="Le Kiosque is busy with After Hours"):
         festival.add_performance(new)
     assert len(festival.performances) == 23  # rien n'a été ajouté
 
@@ -146,33 +147,33 @@ def test_venue_free_exactly_30_minutes_after(festival):
 def test_artist_busy_in_another_venue(festival):
     # Max Pellerin joue Late Laughs au Kiosque à 23:30 le 11.
     new = solo(festival, "max-pellerin", "la-cabane", "2027-06-11T23:00")
-    with pytest.raises(ValueError, match="Max Pellerin is on stage in Late Laughs"):
+    with pytest.raises(ConflictError, match="Max Pellerin is on stage in Late Laughs"):
         festival.add_performance(new)
 
 
 def test_artist_busy_as_an_act_of_a_lineup(festival):
     # Hugo Lemaire est un "act" d'After Hours (01:00-02:00) : pas de solo à 02:00.
     new = solo(festival, "hugo-lemaire", "la-cabane", "2027-06-12T02:00")
-    with pytest.raises(ValueError, match="Hugo Lemaire is on stage in After Hours"):
+    with pytest.raises(ConflictError, match="Hugo Lemaire is on stage in After Hours"):
         festival.add_performance(new)
 
 
 def test_a_day_outside_the_festival(festival):
     new = solo(festival, "karim-benali", "la-cabane", "2027-06-14T08:00")
-    with pytest.raises(ValueError, match="2027-06-14 is not a day of the festival"):
+    with pytest.raises(InvalidError, match="2027-06-14 is not a day of the festival"):
         festival.add_performance(new)
 
 
 def test_one_am_before_the_first_day_is_outside_the_festival(festival):
     # Le 10 à 03:00 appartient à la journée du 9 : avant le festival.
     new = solo(festival, "karim-benali", "la-cabane", "2027-06-10T03:00")
-    with pytest.raises(ValueError, match="2027-06-09 is not a day of the festival"):
+    with pytest.raises(InvalidError, match="2027-06-09 is not a day of the festival"):
         festival.add_performance(new)
 
 
 @pytest.mark.parametrize("minutes", [0, 361])
 def test_a_duration_out_of_range_is_refused(festival, minutes):
-    with pytest.raises(ValueError, match="from 1 to 360 minutes"):
+    with pytest.raises(InvalidError, match="from 1 to 360 minutes"):
         solo(festival, "karim-benali", "la-cabane", "2027-06-13T08:00", minutes)
 
 
@@ -183,27 +184,37 @@ def test_the_limits_of_the_duration_are_allowed(festival, minutes):
 
 
 def test_an_unknown_venue(festival):
-    with pytest.raises(ValueError, match="No venue 'piscine'"):
+    with pytest.raises(NotFoundError, match="No venue 'piscine'"):
         festival.venue("piscine")
 
 
 def test_an_unknown_artist(festival):
-    with pytest.raises(ValueError, match="No artist 'nobody'"):
+    with pytest.raises(NotFoundError, match="No artist 'nobody'"):
         festival.artist("nobody")
 
 
 def test_a_venue_not_in_the_festival_is_refused(festival):
     # Même un objet Venue fabriqué à la main ne passe pas s'il n'est pas au festival.
-    new = solo(festival, "karim-benali", "la-cabane", "2027-06-13T08:00")
-    new.venue = Venue("Piscine", 50, "Nowhere")
-    with pytest.raises(ValueError, match="No venue 'piscine'"):
+    new = SoloShow(
+        "Test Show",
+        Venue("Piscine", 50, "Nowhere"),
+        datetime(2027, 6, 13, 8, 0),
+        30,
+        artist=festival.artist("karim-benali"),
+    )
+    with pytest.raises(NotFoundError, match="No venue 'piscine'"):
         festival.add_performance(new)
 
 
 def test_an_artist_not_in_the_festival_is_refused(festival):
-    new = solo(festival, "karim-benali", "la-cabane", "2027-06-13T08:00")
-    new.artist = Artist("Nobody Known", "", "")
-    with pytest.raises(ValueError, match="No artist 'nobody-known'"):
+    new = SoloShow(
+        "Test Show",
+        festival.venue("la-cabane"),
+        datetime(2027, 6, 13, 8, 0),
+        30,
+        artist=Artist("Nobody Known"),
+    )
+    with pytest.raises(NotFoundError, match="No artist 'nobody-known'"):
         festival.add_performance(new)
 
 
@@ -211,7 +222,7 @@ def test_cancel(festival):
     cancelled = festival.cancel("le-kiosque-2027-06-12-0100")
     assert cancelled.title == "After Hours"
     assert len(festival.performances) == 22
-    with pytest.raises(ValueError, match="No performance"):
+    with pytest.raises(NotFoundError, match="No performance"):
         festival.cancel("le-kiosque-2027-06-12-0100")
 
 
@@ -294,7 +305,7 @@ def test_each_kind_writes_its_own_summary(festival, performance_id, summary):
 
 @pytest.mark.parametrize("min_age", [-1, 19])
 def test_a_minimum_age_out_of_range_is_refused(festival, min_age):
-    with pytest.raises(ValueError, match="minimum age goes from 0 to 18"):
+    with pytest.raises(InvalidError, match="minimum age goes from 0 to 18"):
         SoloShow(
             "X",
             festival.venue("la-cabane"),
@@ -306,29 +317,29 @@ def test_a_minimum_age_out_of_range_is_refused(festival, min_age):
 
 
 def test_a_lineup_needs_two_acts(festival):
-    with pytest.raises(ValueError, match="at least 2 acts"):
+    with pytest.raises(InvalidError, match="at least 2 acts"):
         lineup(festival, ["hugo-lemaire"], 60)
 
 
 def test_each_act_only_once(festival):
-    with pytest.raises(ValueError, match="only once"):
+    with pytest.raises(InvalidError, match="only once"):
         lineup(festival, ["hugo-lemaire", "hugo-lemaire"], 60)
 
 
 def test_the_host_is_not_an_act(festival):
-    with pytest.raises(ValueError, match="both the host and an act"):
+    with pytest.raises(InvalidError, match="both the host and an act"):
         lineup(festival, ["hugo-lemaire", "tom-vasseur"], 60)
 
 
 def test_a_lineup_of_three_acts_needs_36_minutes(festival):
     acts = ["hugo-lemaire", "maya-choukri", "karim-benali"]
-    with pytest.raises(ValueError, match="at least 36 minutes, not 35"):
+    with pytest.raises(InvalidError, match="at least 36 minutes, not 35"):
         lineup(festival, acts, 35)
     assert lineup(festival, acts, 36).duration_minutes == 36
 
 
 def test_a_workshop_needs_one_place(festival):
-    with pytest.raises(ValueError, match="at least 1 place"):
+    with pytest.raises(InvalidError, match="at least 1 place"):
         workshop(festival, "la-cabane", 0)
 
 
@@ -339,7 +350,7 @@ def test_workshop_places_never_exceed_the_venue(festival):
 
 
 def test_a_workshop_cannot_hold_more_participants_than_places(festival):
-    with pytest.raises(ValueError, match="has 1 places, not 2"):
+    with pytest.raises(ConflictError, match="full"):
         workshop(festival, "la-cabane", 1, ["Lou", "Zoé"])
 
 
@@ -351,3 +362,89 @@ def test_the_view_of_each_kind_adds_its_own_fields(festival):
     workshop_view = festival.performance("la-cabane-2027-06-11-1030").to_view()
     assert workshop_view["places_left"] == 9
     assert "acts" not in workshop_view
+
+
+# ----- Étape 10 : personne ne contourne les règles -----
+
+
+def test_attributes_are_read_only(festival):
+    after_hours = festival.performance("le-kiosque-2027-06-12-0100")
+    with pytest.raises(AttributeError):
+        after_hours.start = datetime(2027, 6, 12, 2, 15)
+    with pytest.raises(AttributeError):
+        after_hours.venue = festival.venue("la-cabane")
+
+
+def test_collections_given_out_are_copies(festival):
+    festival.performances.clear()
+    festival.artists.append(Artist("Intruder"))
+    assert len(festival.performances) == 23
+    assert festival.find_artist("intruder") is None
+
+
+def test_the_acts_of_a_lineup_cannot_be_changed(festival):
+    after_hours = festival.performance("le-kiosque-2027-06-12-0100")
+    with pytest.raises(AttributeError):
+        after_hours.acts.append(festival.artist("karim-benali"))
+    assert len(after_hours.acts) == 2
+
+
+def test_participants_only_through_register(festival):
+    workshop = festival.performance("la-cabane-2027-06-11-1030")
+    with pytest.raises(AttributeError):
+        workshop.participants.append("Intruder")
+    festival.register(workshop.id, "Zoé")
+    assert workshop.participants[-1] == "Zoé"
+    assert workshop.places_left == 8
+
+
+def test_the_same_participant_twice_is_refused(festival):
+    stand_up_lab = festival.performance("la-cabane-2027-06-12-1030")
+    festival.register(stand_up_lab.id, "Lou M.")
+    with pytest.raises(ConflictError, match="already registered"):
+        festival.register(stand_up_lab.id, "lou m.")
+
+
+def test_a_full_workshop_refuses(festival):
+    full = workshop(festival, "la-cabane", 1, ["Lou"])
+    with pytest.raises(ConflictError, match="full"):
+        full.register("Zoé")
+
+
+def test_only_a_workshop_takes_participants(festival):
+    with pytest.raises(InvalidError, match="not a workshop"):
+        festival.register("le-kiosque-2027-06-12-0100", "Lou")
+
+
+def test_an_artist_that_already_exists_is_refused(festival):
+    festival.add_artist(Artist("Zoé Tanguy"))
+    with pytest.raises(ConflictError, match="Zoé Tanguy already exists"):
+        festival.add_artist(Artist("zoe tanguy"))
+
+
+def test_replace_moves_a_performance_and_changes_its_id(festival):
+    new = solo(festival, "nora-lebrun", "le-kiosque", "2027-06-13T11:00", 45)
+    festival.add_performance(new)
+    moved = solo(festival, "nora-lebrun", "le-kiosque", "2027-06-13T12:00", 45)
+    festival.replace("le-kiosque-2027-06-13-1100", moved)
+    assert festival.performance("le-kiosque-2027-06-13-1200") is moved
+    with pytest.raises(NotFoundError):
+        festival.performance("le-kiosque-2027-06-13-1100")
+
+
+def test_a_refused_move_changes_nothing(festival):
+    new = solo(festival, "nora-lebrun", "le-kiosque", "2027-06-13T12:00", 45)
+    festival.add_performance(new)
+    before = [p.id for p in festival.programme()]
+    # À 15:00, Maya Choukri joue "First Time Here" au Kiosque : refusé.
+    busy = solo(festival, "nora-lebrun", "le-kiosque", "2027-06-13T15:00", 45)
+    with pytest.raises(ConflictError):
+        festival.replace("le-kiosque-2027-06-13-1200", busy)
+    assert [p.id for p in festival.programme()] == before
+
+
+def test_a_move_does_not_conflict_with_itself(festival):
+    # Allonger un spectacle sur place : il ne se gêne pas lui-même.
+    longer = solo(festival, "lea-fontaine", "grand-casino", "2027-06-11T20:30", 90)
+    festival.replace("grand-casino-2027-06-11-2030", longer)
+    assert festival.performance("grand-casino-2027-06-11-2030").duration_minutes == 90
