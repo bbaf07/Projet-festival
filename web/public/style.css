@@ -1,24 +1,28 @@
 /* Deauville Festival du Rire 2027 — styles partagés par le site et l'admin.
-   Thème sombre, avec des clés de sol animées en fond (background.js). */
+   Thème sombre aux reflets rouges (un rideau de théâtre), avec des clés de
+   sol animées en fond (background.js).
+   Polices : Playfair Display (titres, style affiche de théâtre) et Inter
+   (textes, très lisible à l'écran), chargées depuis Google Fonts. */
 
 :root {
   color-scheme: dark;
-  --bg: #0a1120;
-  --surface: #121b30;
-  --surface-raised: #182440;
-  --line: #253552;
-  --text: #cbd5f0;
-  --heading: #f2f6ff;
-  --muted: #8b98b8;
-  --coral: #ff6b5e;
-  --coral-dark: #e5493c;
-  --sun: #ffc93c;
-  --sea: #4fb3d9;
-  --green: #34d399;
-  --shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
-  --radius: 14px;
-  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --display: Georgia, "Times New Roman", serif;
+  --bg: #120a10;
+  --surface: #1d1018;
+  --surface-raised: #281520;
+  --line: #3d2230;
+  --text: #ecd9de;
+  --heading: #fff4ef;
+  --muted: #b3939e;
+  --coral: #ff5d5d;
+  --coral-dark: #e03e4a;
+  --red-glow: rgba(214, 40, 57, 0.35);
+  --sun: #ffc857;
+  --sea: #ff9f8a;
+  --green: #4fd1a5;
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  --radius: 16px;
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --display: "Playfair Display", Georgia, "Times New Roman", serif;
 }
 
 * {
@@ -27,16 +31,24 @@
 
 body {
   margin: 0;
-  background: var(--bg);
+  /* un léger halo rouge en haut de page, comme un projecteur */
+  background:
+    radial-gradient(1200px 500px at 50% -120px, var(--red-glow), transparent 70%),
+    var(--bg);
+  background-attachment: fixed;
   color: var(--text);
   font-family: var(--font);
-  line-height: 1.5;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
 }
 
 h1,
 h2,
 h3 {
   color: var(--heading);
+  font-family: var(--display);
+  letter-spacing: -0.01em;
 }
 
 a {
@@ -96,9 +108,10 @@ footer {
 /* ----- En-tête ----- */
 
 .hero {
-  background: linear-gradient(180deg, rgba(18, 27, 48, 0.95), rgba(10, 17, 32, 0.6));
+  background: linear-gradient(180deg, rgba(42, 12, 22, 0.9), rgba(18, 10, 16, 0.3));
   border-bottom: 1px solid var(--line);
-  padding: 28px 16px 24px;
+  padding: 40px 16px 28px;
+  text-align: center;
 }
 
 .hero-inner,
@@ -107,29 +120,50 @@ main {
   margin: 0 auto;
 }
 
-.hero h1 {
+/* Le titre : une affiche de théâtre. Lettres très grasses, dégradé doré
+   vers le corail, et un halo rouge derrière. */
+.title {
   font-family: var(--display);
-  font-size: clamp(1.8rem, 4vw, 2.8rem);
-  margin: 0 0 4px;
-  letter-spacing: -0.5px;
+  font-weight: 900;
+  font-size: clamp(2.2rem, 6.5vw, 4.4rem);
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  margin: 0 0 12px;
+  background: linear-gradient(100deg, #ffe3a3 0%, var(--sun) 35%, var(--coral) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 22px var(--red-glow));
 }
 
-.hero h1 .clef {
-  color: var(--sun);
+.title .year {
+  display: block;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 0.5em;
+  letter-spacing: 0.02em;
+}
+
+.title .clef {
   font-family: "Segoe UI Symbol", "Noto Music", serif;
-  margin-right: 6px;
+  font-weight: 400;
+  margin-right: 0.12em;
 }
 
 .hero .dates {
-  color: var(--sun);
+  color: var(--muted);
+  font-size: 0.85rem;
   font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
   margin: 0;
 }
 
 .hero nav {
-  margin-top: 14px;
+  margin-top: 20px;
   display: flex;
-  gap: 16px;
+  justify-content: center;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -137,11 +171,19 @@ main {
   color: var(--text);
   text-decoration: none;
   font-weight: 500;
+  font-size: 0.95rem;
+  padding: 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(29, 16, 24, 0.6);
+  transition:
+    border-color 0.15s,
+    color 0.15s;
 }
 
 .hero nav a:hover {
   color: var(--heading);
-  text-decoration: underline;
+  border-color: var(--coral);
 }
 
 main {
@@ -154,8 +196,21 @@ section {
 
 h2 {
   font-family: var(--display);
-  font-size: 1.6rem;
-  margin: 0 0 14px;
+  font-weight: 800;
+  font-size: clamp(1.6rem, 3.5vw, 2.1rem);
+  margin: 0 0 16px;
+}
+
+/* un petit trait corail sous les titres de section */
+section > h2::after,
+.toolbar > h2::after {
+  content: "";
+  display: block;
+  width: 48px;
+  height: 3px;
+  margin-top: 6px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--coral), var(--sun));
 }
 
 /* ----- Sur scène maintenant ----- */
@@ -173,6 +228,10 @@ h2 {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.now h2::after {
+  display: none;
 }
 
 .live-dot {
@@ -290,6 +349,9 @@ textarea:focus {
 }
 
 .card {
+  transition:
+    transform 0.15s,
+    box-shadow 0.15s;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -299,6 +361,11 @@ textarea:focus {
   flex-direction: column;
   gap: 6px;
   border-top: 4px solid var(--sea);
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
 }
 
 .card.kind-solo {
@@ -322,7 +389,9 @@ textarea:focus {
 
 .card h3 {
   margin: 0;
-  font-size: 1.2rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.2;
 }
 
 .card .venue {

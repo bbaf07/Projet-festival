@@ -19,7 +19,8 @@ function festivalDayOf(moment) {
 
 async function showFestival() {
   const festival = await api("/api/festival");
-  document.getElementById("festival-name").textContent = festival.name;
+  // L'année est affichée à part, en italique : on la retire du nom.
+  document.getElementById("festival-name").textContent = festival.name.replace(/\s*\d{4}$/, "");
   document.getElementById("festival-dates").textContent =
     `Du ${formatDay(festival.first_day)} au ${formatDay(festival.last_day)} 2027`;
 
